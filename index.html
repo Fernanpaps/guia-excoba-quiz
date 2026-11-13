@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Guía EXCOBA Quiz</title>
+  <meta name="description" content="Cuestionario interactivo para estudiar el examen EXCOBA, con explicación paso a paso de cada pregunta.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <button class="brand" id="btn-inicio" type="button" aria-label="Volver al inicio">📚 Guía EXCOBA</button>
+    <span class="topbar-sub">Cuestionario de estudio</span>
+  </header>
+
+  <main id="app">
+    <!-- ===== PANTALLA DE INICIO ===== -->
+    <section id="pantalla-inicio" class="pantalla">
+      <div class="hero">
+        <h1>¿Qué quieres estudiar hoy?</h1>
+        <p>Elige una materia, contesta y, si tienes duda, abre <strong>“Ver procedimiento”</strong> para ver cómo se resuelve paso a paso.</p>
+      </div>
+
+      <div class="config card">
+        <div class="campo">
+          <label for="sel-cantidad">Número de preguntas</label>
+          <select id="sel-cantidad">
+            <option value="10">10 preguntas</option>
+            <option value="20" selected>20 preguntas</option>
+            <option value="40">40 preguntas</option>
+            <option value="0">Todas</option>
+          </select>
+        </div>
+        <label class="check">
+          <input type="checkbox" id="chk-revolver" checked>
+          Revolver el orden de las preguntas
+        </label>
+      </div>
+
+      <button class="mixto" id="btn-mixto" type="button">
+        <span class="mixto-icono">🎲</span>
+        <span>
+          <strong>Examen mixto</strong>
+          <small>Preguntas al azar de todas las materias</small>
+        </span>
+      </button>
+
+      <div class="materias" id="lista-materias"></div>
+
+      <p class="total-preguntas" id="total-preguntas"></p>
+    </section>
+
+    <!-- ===== PANTALLA DE TEMA (elegir tema dentro de una materia) ===== -->
+    <section id="pantalla-materia" class="pantalla oculto">
+      <button class="link-atras" id="btn-atras-materia" type="button">← Volver</button>
+      <h2 id="materia-titulo"></h2>
+      <p class="muted" id="materia-resumen"></p>
+      <button class="btn btn-primario btn-grande" id="btn-empezar-materia" type="button">Empezar con todos los temas</button>
+      <h3 class="subtitulo">O elige un tema</h3>
+      <div class="temas" id="lista-temas"></div>
+    </section>
+
+    <!-- ===== PANTALLA DEL CUESTIONARIO ===== -->
+    <section id="pantalla-quiz" class="pantalla oculto">
+      <div class="quiz-cabecera">
+        <button class="link-atras" id="btn-salir" type="button">← Salir</button>
+        <span class="contador" id="contador"></span>
+        <span class="puntos" id="puntos"></span>
+      </div>
+      <div class="barra"><div class="barra-relleno" id="barra"></div></div>
+
+      <article class="card pregunta-card">
+        <span class="etiqueta" id="etiqueta-tema"></span>
+        <h2 class="pregunta" id="texto-pregunta"></h2>
+        <div class="opciones" id="opciones"></div>
+
+        <div class="retro oculto" id="retro">
+          <p class="retro-texto" id="retro-texto"></p>
+          <button class="btn btn-secundario" id="btn-explicacion" type="button" aria-expanded="false">💡 Ver procedimiento</button>
+          <div class="explicacion oculto" id="explicacion"></div>
+        </div>
+      </article>
+
+      <div class="quiz-acciones">
+        <button class="btn btn-primario" id="btn-siguiente" type="button" disabled>Siguiente →</button>
+      </div>
+    </section>
+
+    <!-- ===== PANTALLA DE RESULTADOS ===== -->
+    <section id="pantalla-resultados" class="pantalla oculto">
+      <div class="card resultado-card">
+        <div class="resultado-emoji" id="resultado-emoji"></div>
+        <h2 id="resultado-titulo"></h2>
+        <p class="resultado-score" id="resultado-score"></p>
+        <p class="muted" id="resultado-mensaje"></p>
+        <div class="resultado-acciones">
+          <button class="btn btn-primario" id="btn-repasar" type="button">Repasar las que fallé</button>
+          <button class="btn btn-secundario" id="btn-otra-vez" type="button">Otra ronda</button>
+          <button class="btn btn-fantasma" id="btn-volver-inicio" type="button">Elegir otra materia</button>
+        </div>
+      </div>
+
+      <h3 class="subtitulo" id="titulo-errores">Preguntas que fallaste</h3>
+      <div id="lista-errores"></div>
+    </section>
+  </main>
+
+  <footer class="pie">made by us :v</footer>
+
+  <!-- Primero el banco, luego las preguntas de cada materia y al final la lógica de la página -->
+  <script src="banco.js"></script>
+  <script src="data/espanol.js"></script>
+  <script src="data/matematicas.js"></script>
+  <script src="data/historia_universal.js"></script>
+  <script src="data/geografia_civismo.js"></script>
+  <script src="data/historia_mexico.js"></script>
+  <script src="data/biologia.js"></script>
+  <script src="data/quimica.js"></script>
+  <script src="data/fisica.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

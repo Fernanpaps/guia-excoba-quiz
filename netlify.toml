@@ -1,0 +1,4 @@
+# Sitio estático: no necesita compilarse, se publica la carpeta tal cual.
+[build]
+  publish = "."
+  command = ""
