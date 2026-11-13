@@ -55,7 +55,9 @@ y abre <http://localhost:8765>.
 
 ## Publicación
 
-El sitio se publica en **Netlify** directamente desde este repositorio (no hay paso de compilación: se sirve la carpeta tal cual, ver `netlify.toml`). Cada vez que se sube un cambio a GitHub, Netlify lo actualiza solo.
+El sitio está publicado en **Netlify**: <https://guia-excoba-quiz.netlify.app>
+
+No hay paso de compilación: se sirve la carpeta tal cual (ver `netlify.toml`). Después de cambiar preguntas hay que volver a desplegar. Si quieres que se actualice solo con cada `git push`, en Netlify ve a **Project configuration → Build & deploy → Link repository** y elige este repo de GitHub.
 
 ---
 
