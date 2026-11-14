@@ -12,6 +12,7 @@
   <header class="topbar">
     <button class="brand" id="btn-inicio" type="button" aria-label="Volver al inicio">📚 Guía EXCOBA</button>
     <span class="topbar-sub">Cuestionario de estudio</span>
+    <button class="btn-cuenta oculto" id="btn-cuenta" type="button">👤 Entrar</button>
   </header>
 
   <main id="app">
@@ -20,6 +21,21 @@
       <div class="hero">
         <h1>¿Qué quieres estudiar hoy?</h1>
         <p>Elige una materia, contesta y, si tienes duda, abre <strong>“Ver procedimiento”</strong> para ver cómo se resuelve paso a paso.</p>
+      </div>
+
+      <!-- Avance guardado (solo si hay cuentas configuradas) -->
+      <div class="card progreso-card oculto" id="caja-progreso">
+        <div id="progreso-invitado">
+          <strong>💾 Guarda tu avance</strong>
+          <p class="muted">Crea una cuenta gratis para guardar tus puntajes, tu historial y las preguntas que fallaste, y seguir desde cualquier celular o compu.</p>
+          <button class="btn btn-secundario" id="btn-ir-login" type="button">Crear cuenta / Iniciar sesión</button>
+        </div>
+        <div id="progreso-usuario" class="oculto">
+          <strong id="progreso-saludo"></strong>
+          <p class="muted" id="progreso-estado"></p>
+          <button class="btn btn-primario oculto" id="btn-repasar-guardadas" type="button"></button>
+          <div id="historial" class="historial"></div>
+        </div>
       </div>
 
       <div class="config card">
@@ -49,6 +65,30 @@
       <div class="materias" id="lista-materias"></div>
 
       <p class="total-preguntas" id="total-preguntas"></p>
+    </section>
+
+    <!-- ===== PANTALLA DE CUENTA ===== -->
+    <section id="pantalla-login" class="pantalla oculto">
+      <button class="link-atras" id="btn-atras-login" type="button">← Volver</button>
+      <div class="card login-card">
+        <div class="pestanas" role="tablist">
+          <button class="pestana activa" id="tab-entrar" type="button" role="tab" aria-selected="true">Iniciar sesión</button>
+          <button class="pestana" id="tab-registro" type="button" role="tab" aria-selected="false">Crear cuenta</button>
+        </div>
+        <form id="form-login" novalidate>
+          <div class="campo">
+            <label for="login-correo">Correo</label>
+            <input id="login-correo" type="email" autocomplete="email" required placeholder="tucorreo@gmail.com">
+          </div>
+          <div class="campo">
+            <label for="login-clave">Contraseña</label>
+            <input id="login-clave" type="password" autocomplete="current-password" required minlength="6" placeholder="Mínimo 6 caracteres">
+          </div>
+          <p class="login-msg oculto" id="login-msg" role="alert"></p>
+          <button class="btn btn-primario btn-grande" id="btn-login-enviar" type="submit">Entrar</button>
+        </form>
+        <p class="muted login-nota">Solo usamos tu cuenta para guardar tu avance. Puedes seguir usando la página sin cuenta.</p>
+      </div>
     </section>
 
     <!-- ===== PANTALLA DE TEMA (elegir tema dentro de una materia) ===== -->
@@ -109,6 +149,9 @@
   <footer class="pie">made by us :v</footer>
 
   <!-- Primero el banco, luego las preguntas de cada materia y al final la lógica de la página -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="config.js"></script>
+  <script src="cuenta.js"></script>
   <script src="banco.js"></script>
   <script src="data/espanol.js"></script>
   <script src="data/matematicas.js"></script>

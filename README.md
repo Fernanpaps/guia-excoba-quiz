@@ -3,7 +3,7 @@
 Página web para estudiar el examen **EXCOBA** con preguntas de opción múltiple sobre **todos los temas de la guía**.
 Contestas, ves al instante si acertaste y, si tienes duda, presionas **“💡 Ver procedimiento”** para ver cómo se resuelve paso a paso.
 
-No pide inicio de sesión: cualquier persona con el enlace puede usarla.
+Cualquier persona con el enlace puede usarla sin cuenta. Si quiere, puede **crear una cuenta gratis** (correo y contraseña) para guardar su avance: mejores puntajes, historial de rondas y las preguntas que falló, para repasarlas después desde cualquier dispositivo.
 
 ## Materias incluidas (1,100+ preguntas)
 
@@ -52,6 +52,16 @@ python -m http.server 8765
 ```
 
 y abre <http://localhost:8765>.
+
+## Cuentas y avance guardado (Supabase)
+
+- `config.js` tiene la dirección del proyecto de Supabase y su **publishable key** (es pública, puede ir aquí). Nunca pongas aquí la *secret key*.
+- `cuenta.js` maneja el inicio de sesión y guarda el avance.
+- `supabase/schema.sql` crea las tablas `progreso` e `intentos` con reglas de seguridad (RLS): cada usuario solo ve y cambia lo suyo. Si algún día se crea otro proyecto, se pega en **SQL Editor → Run**.
+- En Supabase está apagado **Authentication → Email → Confirm email**, para que la gente entre al instante (el correo gratis de Supabase manda muy pocos mensajes por hora).
+- Los usuarios registrados se ven en **Authentication → Users**.
+
+Si `config.js` se deja vacío, la página funciona igual pero sin cuentas.
 
 ## Publicación
 

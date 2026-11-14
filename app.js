@@ -17,9 +17,15 @@
     indice: 0,
     aciertos: 0,
     errores: [],     // { p, elegida }
+    acertadas: [],   // claves de las preguntas contestadas bien en esta ronda
     respondida: false,
     origen: null     // para "otra ronda": { tipo, materiaId, tema }
   };
+
+  // Avance guardado en la cuenta (Supabase), si hay sesión
+  var nube = { activa: false, records: {}, falladas: [] };
+  var Cuenta = window.Cuenta;
+  var hayCuentas = !!(Cuenta && Cuenta.disponible());
 
   // ---------- Utilidades ----------
   function $(id) { return document.getElementById(id); }
@@ -34,7 +40,7 @@
   }
 
   function mostrar(idPantalla) {
-    ["pantalla-inicio", "pantalla-materia", "pantalla-quiz", "pantalla-resultados"].forEach(function (id) {
+    ["pantalla-inicio", "pantalla-login", "pantalla-materia", "pantalla-quiz", "pantalla-resultados"].forEach(function (id) {
       $(id).classList.toggle("oculto", id !== idPantalla);
     });
     window.scrollTo(0, 0);
@@ -48,8 +54,22 @@
     return null;
   }
 
+  // Clave fija de cada pregunta (para guardar cuáles falló cada usuario)
+  function hashTexto(t) {
+    var h = 5381;
+    for (var i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0;
+    return (h >>> 0).toString(36);
+  }
+  function claveDe(p, materiaId) { return materiaId + ":" + hashTexto(p.q + "|" + p.o[p.a]); }
+
+  // Índice clave → pregunta, para poder armar el repaso de preguntas guardadas
+  var indice = {};
+  materias.forEach(function (m) {
+    m.preguntas.forEach(function (p) { indice[claveDe(p, m.id)] = { p: p, m: m }; });
+  });
+
   // Prepara una pregunta: revuelve sus opciones y recuerda cuál es la correcta
-  function prepararPregunta(p, nombreMateria) {
+  function prepararPregunta(p, nombreMateria, materiaId) {
     var orden = p.o.map(function (texto, i) { return { texto: texto, correcta: i === p.a }; });
     orden = revolver(orden);
     return {
@@ -58,13 +78,27 @@
       pregunta: p.q,
       opciones: orden.map(function (x) { return x.texto; }),
       correcta: orden.findIndex(function (x) { return x.correcta; }),
-      explicacion: p.e
+      explicacion: p.e,
+      clave: claveDe(p, materiaId)
     };
   }
 
   // ---------- Guardar mejores puntajes (opcional, solo en este navegador) ----------
-  function leerRecords() {
+  function leerRecordsLocales() {
     try { return JSON.parse(localStorage.getItem("excoba-records") || "{}"); } catch (e) { return {}; }
+  }
+  // Si hay sesión, se combinan los de este navegador con los guardados en la cuenta
+  function leerRecords() {
+    var r = leerRecordsLocales();
+    if (nube.activa) r = combinarRecords(r, nube.records);
+    return r;
+  }
+  function combinarRecords(a, b) {
+    var r = {};
+    [a || {}, b || {}].forEach(function (o) {
+      Object.keys(o).forEach(function (k) { if (r[k] === undefined || o[k] > r[k]) r[k] = o[k]; });
+    });
+    return r;
   }
   function guardarRecord(clave, porcentaje) {
     try {
@@ -149,7 +183,7 @@
   function iniciarMateria(m, tema) {
     var lista = m.preguntas.filter(function (p) { return !tema || p.t === tema; });
     var titulo = tema ? m.nombre + " · " + tema : m.nombre;
-    var preparadas = lista.map(function (p) { return prepararPregunta(p, m.nombre); });
+    var preparadas = lista.map(function (p) { return prepararPregunta(p, m.nombre, m.id); });
     // Si eligió un tema, se muestran todas las de ese tema
     empezar(titulo, preparadas, !tema, { tipo: "materia", materiaId: m.id, tema: tema });
   }
@@ -157,7 +191,7 @@
   function iniciarMixto() {
     var todas = [];
     materias.forEach(function (m) {
-      m.preguntas.forEach(function (p) { todas.push(prepararPregunta(p, m.nombre)); });
+      m.preguntas.forEach(function (p) { todas.push(prepararPregunta(p, m.nombre, m.id)); });
     });
     // El examen mixto siempre se revuelve para que salgan materias variadas
     empezar("Examen mixto", revolver(todas), true, { tipo: "mixto" }, true);
@@ -174,6 +208,7 @@
     estado.indice = 0;
     estado.aciertos = 0;
     estado.errores = [];
+    estado.acertadas = [];
     estado.origen = origen;
 
     mostrar("pantalla-quiz");
@@ -233,6 +268,7 @@
     var retro = $("retro-texto");
     if (elegida === p.correcta) {
       estado.aciertos++;
+      estado.acertadas.push(p.clave);
       retro.textContent = "¡Correcto! 🎉";
       retro.className = "retro-texto bien";
     } else {
@@ -292,9 +328,9 @@
     $("resultado-score").textContent = estado.aciertos + " / " + total + "  (" + pct + "%)";
     $("resultado-mensaje").textContent = mensaje;
 
-    if (estado.origen && estado.origen.tipo === "materia" && !estado.origen.tema) {
-      guardarRecord(estado.origen.materiaId, pct);
-    }
+    var esRecord = estado.origen && estado.origen.tipo === "materia" && !estado.origen.tema;
+    if (esRecord) guardarRecord(estado.origen.materiaId, pct);
+    guardarEnNube(esRecord ? estado.origen.materiaId : null, pct, total);
 
     var hayErrores = estado.errores.length > 0;
     $("btn-repasar").classList.toggle("oculto", !hayErrores);
@@ -350,7 +386,7 @@
       var orden = p.opciones.map(function (t, i) { return { texto: t, correcta: i === p.correcta }; });
       orden = revolver(orden);
       return {
-        tema: p.tema, materia: p.materia, pregunta: p.pregunta, explicacion: p.explicacion,
+        tema: p.tema, materia: p.materia, pregunta: p.pregunta, explicacion: p.explicacion, clave: p.clave,
         opciones: orden.map(function (x) { return x.texto; }),
         correcta: orden.findIndex(function (x) { return x.correcta; })
       };
@@ -366,11 +402,167 @@
       if (m) { iniciarMateria(m, o.tema); return; }
     }
     if (o && o.tipo === "repaso") { repasarErrores(); return; }
+    if (o && o.tipo === "guardadas") { repasarGuardadas(); return; }
     iniciarMixto();
+  }
+
+  // ---------- Cuenta: guardar y mostrar el avance ----------
+  function guardarEnNube(materiaRecord, pct, total) {
+    if (!nube.activa) return;
+    if (materiaRecord && (nube.records[materiaRecord] === undefined || pct > nube.records[materiaRecord])) {
+      nube.records[materiaRecord] = pct;
+    }
+    // Las que falló se agregan a "por repasar"; las que contestó bien se quitan
+    var pendientes = {};
+    nube.falladas.forEach(function (k) { pendientes[k] = true; });
+    estado.errores.forEach(function (e) { if (e.p.clave) pendientes[e.p.clave] = true; });
+    estado.acertadas.forEach(function (k) { delete pendientes[k]; });
+    nube.falladas = Object.keys(pendientes).filter(function (k) { return indice[k]; });
+
+    var records = combinarRecords(leerRecordsLocales(), nube.records);
+    Cuenta.guardarIntento(estado.titulo, estado.aciertos, total)
+      .then(function () { return Cuenta.guardarProgreso(records, nube.falladas); })
+      .catch(function (e) {
+        console.warn("No se pudo guardar el avance:", e);
+        $("resultado-mensaje").textContent += " (No se pudo guardar en tu cuenta; revisa tu conexión.)";
+      });
+  }
+
+  function pintarProgreso() {
+    if (!hayCuentas) return;
+    $("caja-progreso").classList.remove("oculto");
+    var u = Cuenta.usuario();
+    $("progreso-invitado").classList.toggle("oculto", !!u);
+    $("progreso-usuario").classList.toggle("oculto", !u);
+    $("btn-cuenta").textContent = u ? "👤 " + u.email.split("@")[0] : "👤 Entrar";
+    if (!u) return;
+
+    $("progreso-saludo").textContent = "Hola, " + u.email.split("@")[0] + " 👋";
+    var n = nube.falladas.length;
+    $("progreso-estado").textContent = !nube.activa ? "Cargando tu avance…" :
+      (n ? "Tienes " + n + " pregunta" + (n === 1 ? "" : "s") + " por repasar. Cuando las contestes bien, se quitan de la lista." :
+           "No tienes preguntas pendientes. Tu avance se guarda solo cada vez que terminas una ronda.");
+    var btn = $("btn-repasar-guardadas");
+    btn.classList.toggle("oculto", !n);
+    btn.textContent = "🔁 Repasar mis " + n + " preguntas falladas";
+
+    var cont = $("historial");
+    cont.innerHTML = "";
+    if (!nube.activa) return;
+    Cuenta.historial(5).then(function (filas) {
+      cont.innerHTML = "";
+      if (!filas.length) return;
+      var t = document.createElement("strong");
+      t.textContent = "Últimas rondas";
+      t.style.fontSize = ".9rem";
+      cont.appendChild(t);
+      filas.forEach(function (f) {
+        var fila = document.createElement("div");
+        fila.className = "historial-fila";
+        var a = document.createElement("span");
+        var fecha = new Date(f.created_at);
+        a.textContent = f.titulo + " · " + fecha.toLocaleDateString("es-MX", { day: "numeric", month: "short" });
+        var b = document.createElement("span");
+        b.className = "historial-pct";
+        b.textContent = f.aciertos + "/" + f.total + " (" + f.porcentaje + "%)";
+        b.style.color = f.porcentaje >= 70 ? "var(--ok)" : (f.porcentaje >= 50 ? "var(--text)" : "var(--bad)");
+        fila.appendChild(a); fila.appendChild(b);
+        cont.appendChild(fila);
+      });
+    }).catch(function () {});
+  }
+
+  function enInicio() { return !$("pantalla-inicio").classList.contains("oculto"); }
+
+  function alCambiarUsuario(u) {
+    nube = { activa: false, records: {}, falladas: [] };
+    pintarProgreso();
+    if (!u) { if (enInicio()) pintarInicio(); return; }
+    Cuenta.cargarProgreso().then(function (d) {
+      nube.records = (d && d.records) || {};
+      nube.falladas = ((d && d.falladas) || []).filter(function (k) { return indice[k]; });
+      nube.activa = true;
+      // Sube a la cuenta los récords que ya tenía en este navegador
+      var combinados = combinarRecords(leerRecordsLocales(), nube.records);
+      if (!d || JSON.stringify(combinados) !== JSON.stringify(nube.records)) {
+        nube.records = combinados;
+        Cuenta.guardarProgreso(nube.records, nube.falladas).catch(function () {});
+      }
+      if (enInicio()) pintarInicio();
+      pintarProgreso();
+    }).catch(function (e) {
+      console.warn("No se pudo cargar el avance:", e);
+      $("progreso-estado").textContent = "No se pudo cargar tu avance. Revisa tu conexión y recarga la página.";
+    });
+  }
+
+  function repasarGuardadas() {
+    var lista = nube.falladas.map(function (k) { return indice[k]; }).filter(Boolean)
+      .map(function (x) { return prepararPregunta(x.p, x.m.nombre, x.m.id); });
+    if (!lista.length) { irInicio(); return; }
+    empezar("Mis preguntas falladas", revolver(lista), false, { tipo: "guardadas" }, true);
+  }
+
+  // ---------- Pantalla de login ----------
+  var modoRegistro = false;
+  function abrirLogin() {
+    if (Cuenta.usuario()) {
+      if (confirm("¿Cerrar sesión de " + Cuenta.usuario().email + "?")) {
+        Cuenta.salir().then(irInicio);
+      }
+      return;
+    }
+    cambiarModo(false);
+    mostrar("pantalla-login");
+    $("login-correo").focus();
+  }
+  function cambiarModo(registro, conservarMensaje) {
+    modoRegistro = registro;
+    $("tab-entrar").classList.toggle("activa", !registro);
+    $("tab-registro").classList.toggle("activa", registro);
+    $("tab-entrar").setAttribute("aria-selected", registro ? "false" : "true");
+    $("tab-registro").setAttribute("aria-selected", registro ? "true" : "false");
+    $("btn-login-enviar").textContent = registro ? "Crear cuenta" : "Entrar";
+    $("login-clave").setAttribute("autocomplete", registro ? "new-password" : "current-password");
+    if (!conservarMensaje) mensajeLogin("", "");
+  }
+  function mensajeLogin(texto, tipo) {
+    var el = $("login-msg");
+    el.textContent = texto;
+    el.className = "login-msg " + tipo;
+    el.classList.toggle("oculto", !texto);
+  }
+  function enviarLogin(ev) {
+    ev.preventDefault();
+    var correo = $("login-correo").value.trim();
+    var clave = $("login-clave").value;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) { mensajeLogin("Escribe un correo válido.", "error"); return; }
+    if (clave.length < 6) { mensajeLogin("La contraseña debe tener al menos 6 caracteres.", "error"); return; }
+
+    var btn = $("btn-login-enviar");
+    btn.disabled = true;
+    btn.textContent = "Un momento…";
+    var eraRegistro = modoRegistro;
+    var accion = eraRegistro ? Cuenta.registrar(correo, clave) : Cuenta.entrar(correo, clave);
+    accion.then(function (r) {
+      if (eraRegistro && r && r.necesitaConfirmar) {
+        cambiarModo(false);
+        mensajeLogin("¡Cuenta creada! Te mandamos un correo a " + correo + ". Abre el enlace para confirmarla y luego inicia sesión aquí.", "info");
+        return;
+      }
+      $("login-clave").value = "";
+      irInicio();
+    }).catch(function (e) {
+      mensajeLogin(e.message || String(e), "error");
+    }).then(function () {
+      btn.disabled = false;
+      btn.textContent = modoRegistro ? "Crear cuenta" : "Entrar";
+    });
   }
 
   function irInicio() {
     pintarInicio();
+    pintarProgreso();
     mostrar("pantalla-inicio");
   }
 
@@ -387,6 +579,18 @@
   $("btn-repasar").addEventListener("click", repasarErrores);
   $("btn-otra-vez").addEventListener("click", otraRonda);
   $("btn-volver-inicio").addEventListener("click", irInicio);
+
+  if (hayCuentas) {
+    $("btn-cuenta").classList.remove("oculto");
+    $("btn-cuenta").addEventListener("click", abrirLogin);
+    $("btn-ir-login").addEventListener("click", abrirLogin);
+    $("btn-atras-login").addEventListener("click", irInicio);
+    $("tab-entrar").addEventListener("click", function () { cambiarModo(false); });
+    $("tab-registro").addEventListener("click", function () { cambiarModo(true); });
+    $("form-login").addEventListener("submit", enviarLogin);
+    $("btn-repasar-guardadas").addEventListener("click", repasarGuardadas);
+    Cuenta.alCambiar(alCambiarUsuario);
+  }
 
   // Atajos de teclado: 1-4 o A-D para responder, Enter para seguir
   document.addEventListener("keydown", function (ev) {
