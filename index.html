@@ -54,6 +54,31 @@
         </label>
       </div>
 
+      <div class="card simulacro-card">
+        <div class="simulacro-cabeza">
+          <span class="mixto-icono" aria-hidden="true">🎯</span>
+          <div>
+            <strong>Simulacro EXCOBA</strong>
+            <p class="muted">Como el examen real: 1 minuto por pregunta, no ves si acertaste hasta el final y vienen los 4 formatos (escribir números, expresiones, clasificar, ordenar y elegir). La meta es <strong>70</strong>.</p>
+          </div>
+        </div>
+        <div class="simulacro-controles">
+          <select id="sel-simulacro" aria-label="Tamaño del simulacro">
+            <option value="30" selected>30 preguntas · 30 min</option>
+            <option value="60">60 preguntas · 1 h</option>
+            <option value="120">120 preguntas · 2 h</option>
+            <option value="180">180 preguntas · 3 h (completo)</option>
+          </select>
+          <button class="btn btn-primario" id="btn-simulacro" type="button">Empezar simulacro</button>
+        </div>
+        <p class="simulacro-record" id="simulacro-record"></p>
+      </div>
+
+      <div class="atajos">
+        <button class="btn btn-secundario" id="btn-formato" type="button">✍️ Practicar formato examen</button>
+        <button class="btn btn-fantasma" id="btn-formulario-inicio" type="button">📐 Ver formulario</button>
+      </div>
+
       <button class="mixto" id="btn-mixto" type="button">
         <span class="mixto-icono">🎲</span>
         <span>
@@ -97,6 +122,7 @@
       <h2 id="materia-titulo"></h2>
       <p class="muted" id="materia-resumen"></p>
       <button class="btn btn-primario btn-grande" id="btn-empezar-materia" type="button">Empezar con todos los temas</button>
+      <button class="btn btn-secundario btn-grande oculto" id="btn-formato-materia" type="button">✍️ Solo preguntas con formato de examen</button>
       <h3 class="subtitulo">O elige un tema</h3>
       <div class="temas" id="lista-temas"></div>
     </section>
@@ -107,13 +133,19 @@
         <button class="link-atras" id="btn-salir" type="button">← Salir</button>
         <span class="contador" id="contador"></span>
         <span class="puntos" id="puntos"></span>
+        <span class="reloj oculto" id="reloj" role="timer" aria-live="off"></span>
       </div>
       <div class="barra"><div class="barra-relleno" id="barra"></div></div>
 
       <article class="card pregunta-card">
-        <span class="etiqueta" id="etiqueta-tema"></span>
+        <div class="etiquetas">
+          <span class="etiqueta" id="etiqueta-tema"></span>
+          <span class="etiqueta etiqueta-tipo oculto" id="etiqueta-tipo"></span>
+          <button class="btn-formulario" id="btn-formulario" type="button">📐 Formulario</button>
+        </div>
         <h2 class="pregunta" id="texto-pregunta"></h2>
-        <div class="opciones" id="opciones"></div>
+        <p class="instruccion oculto" id="instruccion"></p>
+        <div class="zona-respuesta" id="zona-respuesta"></div>
 
         <div class="retro oculto" id="retro">
           <p class="retro-texto" id="retro-texto"></p>
@@ -123,6 +155,8 @@
       </article>
 
       <div class="quiz-acciones">
+        <button class="btn btn-fantasma oculto" id="btn-saltar" type="button">Saltar (regreso después)</button>
+        <button class="btn btn-primario oculto" id="btn-comprobar" type="button">Comprobar</button>
         <button class="btn btn-primario" id="btn-siguiente" type="button" disabled>Siguiente →</button>
       </div>
     </section>
@@ -134,6 +168,7 @@
         <h2 id="resultado-titulo"></h2>
         <p class="resultado-score" id="resultado-score"></p>
         <p class="muted" id="resultado-mensaje"></p>
+        <div class="desglose oculto" id="desglose"></div>
         <div class="resultado-acciones">
           <button class="btn btn-primario" id="btn-repasar" type="button">Repasar las que fallé</button>
           <button class="btn btn-secundario" id="btn-otra-vez" type="button">Otra ronda</button>
@@ -146,12 +181,102 @@
     </section>
   </main>
 
+  <dialog class="dlg-formulario" id="dlg-formulario" aria-labelledby="titulo-formulario">
+    <div class="dlg-cabeza">
+      <strong id="titulo-formulario">📐 Formulario</strong>
+      <button class="btn btn-fantasma" id="btn-cerrar-formulario" type="button">Cerrar ✕</button>
+    </div>
+    <p class="muted dlg-nota">Estas son las fórmulas que te dan en el examen. Apréndete para qué sirve cada una.</p>
+    <div class="formulario">
+      <section>
+        <h3>Perímetro, área y volumen</h3>
+        <ul>
+          <li>π = 3.14</li><li>c² = a² + b² <span>(Pitágoras)</span></li>
+          <li>L = 2πr &nbsp;·&nbsp; L = πd <span>(perímetro del círculo)</span></li>
+          <li>A = πr² <span>(área del círculo, no viene en el formulario: apréndetela)</span></li>
+          <li>A = b·h <span>(rectángulo)</span></li><li>A = b·h / 2 <span>(triángulo)</span></li>
+          <li>A = P·a / 2 <span>(polígono regular: P perímetro, a apotema)</span></li>
+          <li>A = D·d / 2 <span>(rombo)</span></li><li>A = (B + b)·h / 2 <span>(trapecio)</span></li>
+          <li>V = A<sub>b</sub>·h <span>(prisma y cilindro; cono y pirámide ÷ 3)</span></li>
+        </ul>
+      </section>
+      <section>
+        <h3>Geometría en el plano</h3>
+        <ul>
+          <li>d = √[(x₁ − x₂)² + (y₁ − y₂)²] <span>(distancia entre puntos)</span></li>
+          <li>m = (y₂ − y₁) / (x₂ − x₁) <span>(pendiente)</span></li>
+          <li>y − y₀ = m(x − x₀) <span>(recta punto-pendiente)</span></li>
+          <li>(x − h)² + (y − k)² = r² <span>(circunferencia)</span></li>
+          <li>(x − h)² = 4P(y − k) &nbsp;·&nbsp; (y − k)² = 4P(x − h) <span>(parábola)</span></li>
+        </ul>
+      </section>
+      <section>
+        <h3>Álgebra y trigonometría</h3>
+        <ul>
+          <li>x = [−b ± √(b² − 4ac)] / 2a <span>(fórmula general)</span></li>
+          <li>(a + b)² = a² + 2ab + b² &nbsp;·&nbsp; (a + b)(a − b) = a² − b²</li>
+          <li>sen θ = CO / H &nbsp;·&nbsp; cos θ = CA / H &nbsp;·&nbsp; tan θ = CO / CA</li>
+          <li>senA / a = senB / b = senC / c <span>(ley de senos)</span></li>
+          <li>a² = b² + c² − 2bc·cosA <span>(ley de cosenos)</span></li>
+        </ul>
+      </section>
+      <section>
+        <h3>Probabilidad y estadística</h3>
+        <ul>
+          <li>x̄ = Σ(xᵢ·fᵢ) / Σfᵢ <span>(media)</span></li>
+          <li>P(A ∩ B) = P(A)·P(B) <span>("y", independientes)</span></li>
+          <li>P(A ∪ B) = P(A) + P(B) − P(A ∩ B) <span>("o")</span></li>
+          <li>nPr = n! / (n − r)! <span>(permutaciones: importa el orden)</span></li>
+          <li>nCr = n! / [r!(n − r)!] <span>(combinaciones: no importa el orden)</span></li>
+        </ul>
+      </section>
+      <section>
+        <h3>Física</h3>
+        <ul>
+          <li>MRU: v = d / t</li>
+          <li>MRUA: a = (v<sub>f</sub> − v₀) / t &nbsp;·&nbsp; v<sub>f</sub> = v₀ + at &nbsp;·&nbsp; d = v₀t + at²/2 &nbsp;·&nbsp; d = (v<sub>f</sub>² − v₀²) / 2a</li>
+          <li>Caída libre: g = 9.8 m/s² &nbsp;·&nbsp; v<sub>f</sub> = v₀ + gt &nbsp;·&nbsp; h = v₀t + gt²/2</li>
+          <li>Tiro parabólico: v₀ₓ = v₀cosθ &nbsp;·&nbsp; v₀ᵧ = v₀senθ &nbsp;·&nbsp; x = v₀ₓ·t</li>
+          <li>MCU: T = 1/f &nbsp;·&nbsp; ω = 2πf &nbsp;·&nbsp; v = 2πr / T</li>
+          <li>F = m·a &nbsp;·&nbsp; Peso = m·g</li>
+          <li>F = G·m₁m₂ / d² <span>(G = 6.67×10⁻¹¹ N·m²/kg²)</span></li>
+          <li>W = F·d·cosθ &nbsp;·&nbsp; P = F / A <span>(presión)</span></li>
+          <li>E<sub>c</sub> = ½mv² &nbsp;·&nbsp; E<sub>p</sub> = mgh</li>
+          <li>F = k·q₁q₂ / d² <span>(k = 9×10⁹ N·m²/C²)</span></li>
+          <li>V = I·R &nbsp;·&nbsp; I = Q / t &nbsp;·&nbsp; P = V·I = V² / R</li>
+        </ul>
+      </section>
+      <section>
+        <h3>Química</h3>
+        <ul>
+          <li>Masa molar = Σ (n × masa atómica)</li>
+          <li>Molaridad = masa / (masa molar × litros)</li>
+          <li>% masa = m₁ / (m₁ + m₂) × 100</li>
+          <li>pH = −log[H⁺] &nbsp;·&nbsp; pOH = −log[OH⁻] &nbsp;·&nbsp; pH + pOH = 14</li>
+        </ul>
+      </section>
+      <section>
+        <h3>Factores de conversión</h3>
+        <ul>
+          <li>1 km = 0.621 mi &nbsp;·&nbsp; 1 mi = 1.61 km</li>
+          <li>1 kg = 2.22 lb &nbsp;·&nbsp; 1 lb = 0.45 kg</li>
+          <li>1 h = 3600 s &nbsp;·&nbsp; 1 año = 365 días</li>
+          <li>1 m³ = 1000 dm³ = 1 000 000 cm³ = 1000 L &nbsp;·&nbsp; 1 L = 1000 mL</li>
+          <li>1 km/h = 0.278 m/s &nbsp;·&nbsp; 1 m/s = 3.6 km/h</li>
+          <li>1 N = 100 000 dinas</li>
+          <li>°C = (°F − 32)(0.56) &nbsp;·&nbsp; °F = °C × 1.8 + 32 &nbsp;·&nbsp; °C = K − 273</li>
+        </ul>
+      </section>
+    </div>
+  </dialog>
+
   <footer class="pie">made by us :v</footer>
 
   <!-- Primero el banco, luego las preguntas de cada materia y al final la lógica de la página -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   <script src="config.js"></script>
   <script src="cuenta.js"></script>
+  <script src="tipos.js"></script>
   <script src="banco.js"></script>
   <script src="data/espanol.js"></script>
   <script src="data/matematicas.js"></script>
@@ -161,6 +286,11 @@
   <script src="data/biologia.js"></script>
   <script src="data/quimica.js"></script>
   <script src="data/fisica.js"></script>
+  <!-- Preguntas con el formato del examen real -->
+  <script src="data/examen/matematicas.js"></script>
+  <script src="data/examen/espanol.js"></script>
+  <script src="data/examen/ciencias.js"></script>
+  <script src="data/examen/sociales.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

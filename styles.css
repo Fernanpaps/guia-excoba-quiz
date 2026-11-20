@@ -316,3 +316,117 @@ select {
   .topbar-sub { display: none; }
   .btn-cuenta { max-width: 50vw; }
 }
+
+/* ===== Formatos del examen real ===== */
+.zona-respuesta { display: flex; flex-direction: column; gap: 10px; }
+.etiquetas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.etiqueta-tipo { color: #b45309; background: var(--warn-soft); }
+.btn-formulario {
+  margin-left: auto; background: none; border: 1px solid var(--border); border-radius: 99px;
+  padding: 3px 10px; font-size: .8rem; font-weight: 600; color: var(--muted); cursor: pointer;
+}
+.btn-formulario:hover { border-color: var(--primary); color: var(--primary); }
+.instruccion {
+  margin: -6px 0 14px; font-size: .9rem; color: var(--muted);
+  padding: 8px 12px; background: var(--bg); border-radius: 10px;
+}
+.opcion.elegida { border-color: var(--primary); background: var(--primary-soft); }
+.opcion.elegida .opcion-letra { background: var(--primary); color: #fff; border-color: var(--primary); }
+.opcion.faltante { border-color: var(--ok); border-style: dashed; }
+.opcion-check .opcion-letra { border-radius: 6px; }
+.retro-texto.parcial { color: #b45309; }
+.error-texto { color: var(--bad) !important; }
+
+.campo-num { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.campo-etq { font-weight: 700; }
+.campo-unidad { color: var(--muted); font-weight: 600; }
+.input-resp {
+  flex: 1 1 160px; min-width: 0; max-width: 280px;
+  padding: 11px 12px; font-size: 1.05rem;
+  border: 2px solid var(--border); border-radius: 10px; background: var(--card);
+}
+.input-alg { max-width: 420px; font-family: ui-monospace, Consolas, monospace; }
+.input-resp:focus { border-color: var(--primary); outline: none; }
+.input-resp.correcta, .hueco.correcta { border-color: var(--ok); background: var(--ok-soft); }
+.input-resp.incorrecta, .hueco.incorrecta { border-color: var(--bad); background: var(--bad-soft); }
+.vista-alg { margin: 0; font-size: .92rem; min-height: 1.3em; }
+
+.banco, .columna {
+  border: 2px dashed var(--border); border-radius: 12px; padding: 10px;
+  background: var(--bg);
+}
+.banco-titulo, .columna-titulo { display: block; font-size: .8rem; font-weight: 700; color: var(--muted); margin-bottom: 8px; }
+.columnas { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.columna { min-height: 90px; cursor: pointer; transition: border-color .15s; }
+.zona-respuesta.eligiendo .columna { border-color: var(--primary); border-style: solid; }
+.columna-titulo { color: var(--text); font-size: .9rem; text-align: center; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; min-height: 36px; }
+.chip {
+  padding: 8px 12px; border-radius: 10px; border: 2px solid var(--border);
+  background: var(--card); cursor: pointer; text-align: left; font-size: .95rem;
+}
+.chip:hover:not(:disabled) { border-color: var(--primary); }
+.chip.seleccionado { border-color: var(--primary); background: var(--primary); color: #fff; }
+.chip.correcta { border-color: var(--ok); background: var(--ok-soft); }
+.chip.incorrecta { border-color: var(--bad); background: var(--bad-soft); }
+.chip:disabled { cursor: default; color: var(--text); }
+
+.texto-huecos { line-height: 2.3; font-size: 1.05rem; margin: 0; }
+.hueco {
+  font: inherit; padding: 3px 6px; margin: 0 4px; max-width: 100%;
+  border: 2px solid var(--primary); border-radius: 8px; background: var(--card);
+}
+.hueco-correcto { color: var(--ok); font-weight: 700; margin-right: 4px; }
+.lista-ordenar { display: flex; flex-direction: column; gap: 8px; }
+
+/* Simulacro */
+.simulacro-card { margin-bottom: 14px; border-color: var(--primary); }
+.simulacro-cabeza { display: flex; gap: 12px; align-items: flex-start; }
+.simulacro-cabeza p { margin: 4px 0 12px; font-size: .92rem; }
+.simulacro-controles { display: flex; flex-wrap: wrap; gap: 10px; }
+.simulacro-controles select { flex: 1 1 200px; }
+.simulacro-record { margin: 10px 0 0; font-size: .9rem; font-weight: 600; color: var(--muted); }
+.simulacro-record:empty { display: none; }
+.atajos { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.atajos .btn { flex: 1 1 200px; }
+.reloj { font-weight: 800; font-variant-numeric: tabular-nums; color: var(--primary); }
+.reloj.poco-tiempo { color: var(--bad); }
+.quiz-acciones { gap: 10px; flex-wrap: wrap; }
+.modo-simulacro .puntos { display: none; }
+
+/* Desglose por materia */
+.desglose { text-align: left; margin-top: 18px; display: flex; flex-direction: column; gap: 8px; }
+.desglose-fila { display: grid; grid-template-columns: minmax(90px, 1.2fr) 2fr auto; gap: 10px; align-items: center; font-size: .9rem; }
+.desglose-nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.desglose-barra { height: 10px; background: var(--border); border-radius: 99px; overflow: hidden; }
+.desglose-relleno { display: block; height: 100%; border-radius: 99px; }
+.desglose-relleno.bien { background: var(--ok); }
+.desglose-relleno.medio { background: #f59e0b; }
+.desglose-relleno.mal { background: var(--bad); }
+.desglose-pct { font-variant-numeric: tabular-nums; color: var(--muted); }
+.desglose-nota { font-size: .85rem; margin: 4px 0 0; }
+.error-linea { white-space: pre-line; }
+.error-item .etiqueta-tipo { margin-left: 6px; }
+
+/* Formulario */
+.dlg-formulario {
+  width: min(720px, calc(100vw - 24px)); max-height: calc(100vh - 32px);
+  padding: 0; border: 1px solid var(--border); border-radius: 16px;
+  background: var(--card); color: var(--text);
+}
+.dlg-formulario::backdrop { background: rgba(10, 12, 20, .55); }
+.dlg-cabeza {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  position: sticky; top: 0; background: var(--card); padding: 14px 16px; border-bottom: 1px solid var(--border);
+}
+.dlg-cabeza .btn { padding: 7px 12px; }
+.dlg-nota { margin: 12px 16px 0; font-size: .9rem; }
+.formulario { padding: 4px 16px 18px; display: grid; gap: 4px 20px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.formulario h3 { font-size: .95rem; margin: 14px 0 6px; color: var(--primary); }
+.formulario ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px; font-size: .93rem; }
+.formulario li span { color: var(--muted); font-size: .85rem; }
+@media (max-width: 520px) {
+  .desglose-fila { grid-template-columns: 1fr auto; }
+  .desglose-barra { grid-column: 1 / -1; grid-row: 2; }
+  .quiz-acciones .btn { flex: 1 1 auto; min-width: 0; }
+}

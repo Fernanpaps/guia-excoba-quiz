@@ -1,25 +1,32 @@
 // ============================================================
 //  Lógica del cuestionario
-//  - Las preguntas viven en /data (una materia por archivo).
-//  - En cada pregunta la respuesta correcta es la opción con índice "a".
-//    Aquí las opciones se revuelven para que no siempre quede en la misma letra.
+//  - Las preguntas viven en /data (una materia por archivo) y /data/examen
+//    (preguntas con el formato del EXCOBA real: escribir, clasificar, etc.).
+//  - Cómo se contesta y califica cada tipo de pregunta está en tipos.js.
+//  - Modos: práctica (ves si acertaste al momento) y simulacro (con tiempo,
+//    sin ver respuestas hasta el final, como el examen real).
 // ============================================================
 (function () {
   "use strict";
 
-  var LETRAS = ["A", "B", "C", "D", "E", "F"];
   var materias = window.MATERIAS || [];
+  var Tipos = window.TiposPregunta;
+  var META = 70; // calificación objetivo
 
   // Estado del cuestionario actual
   var estado = {
+    modo: "practica",  // "practica" | "simulacro"
     titulo: "",
-    preguntas: [],   // preguntas de la ronda (ya con opciones revueltas)
-    indice: 0,
-    aciertos: 0,
-    errores: [],     // { p, elegida }
-    acertadas: [],   // claves de las preguntas contestadas bien en esta ronda
+    preguntas: [],     // preguntas preparadas
+    cola: [],          // orden en que se van mostrando (índices de preguntas)
+    pos: 0,            // posición dentro de la cola
+    puntos: 0,
+    respuestas: [],    // respuesta de cada pregunta (índice = pregunta)
+    notas: [],         // calificación 0..1 de cada pregunta
     respondida: false,
-    origen: null     // para "otra ronda": { tipo, materiaId, tema }
+    origen: null,      // para "otra ronda"
+    fin: 0,            // hora en que se acaba el tiempo (simulacro)
+    reloj: null
   };
 
   // Avance guardado en la cuenta (Supabase), si hay sesión
@@ -29,30 +36,34 @@
 
   // ---------- Utilidades ----------
   function $(id) { return document.getElementById(id); }
-
-  function revolver(lista) {
-    var copia = lista.slice();
-    for (var i = copia.length - 1; i > 0; i--) {
-      var j = Math.floor(Math.random() * (i + 1));
-      var tmp = copia[i]; copia[i] = copia[j]; copia[j] = tmp;
-    }
-    return copia;
+  function el(tag, clase, texto) {
+    var e = document.createElement(tag);
+    if (clase) e.className = clase;
+    if (texto !== undefined) e.textContent = texto;
+    return e;
   }
-
+  function revolver(lista) {
+    var c = lista.slice();
+    for (var i = c.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = c[i]; c[i] = c[j]; c[j] = t;
+    }
+    return c;
+  }
   function mostrar(idPantalla) {
     ["pantalla-inicio", "pantalla-login", "pantalla-materia", "pantalla-quiz", "pantalla-resultados"].forEach(function (id) {
       $(id).classList.toggle("oculto", id !== idPantalla);
     });
     window.scrollTo(0, 0);
   }
-
   function cantidadElegida() { return parseInt($("sel-cantidad").value, 10) || 0; }
   function revolverActivo() { return $("chk-revolver").checked; }
-
   function buscarMateria(id) {
     for (var i = 0; i < materias.length; i++) if (materias[i].id === id) return materias[i];
     return null;
   }
+  function redondear(n) { return Math.round(n * 100) / 100; }
+  function esFormatoExamen(p) { return !!p.tipo && p.tipo !== "opcion"; }
 
   // Clave fija de cada pregunta (para guardar cuáles falló cada usuario)
   function hashTexto(t) {
@@ -60,34 +71,44 @@
     for (var i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0;
     return (h >>> 0).toString(36);
   }
-  function claveDe(p, materiaId) { return materiaId + ":" + hashTexto(p.q + "|" + p.o[p.a]); }
+  function claveDe(p, materiaId) {
+    if (!p.tipo || p.tipo === "opcion") return materiaId + ":" + hashTexto(p.q + "|" + p.o[p.a]);
+    return materiaId + ":" + p.tipo + ":" + hashTexto(p.q + "|" + JSON.stringify(p.r || p.items || p.huecos || p.a || ""));
+  }
 
-  // Índice clave → pregunta, para poder armar el repaso de preguntas guardadas
+  // Índice clave → pregunta, para armar el repaso de preguntas guardadas
   var indice = {};
   materias.forEach(function (m) {
     m.preguntas.forEach(function (p) { indice[claveDe(p, m.id)] = { p: p, m: m }; });
   });
 
-  // Prepara una pregunta: revuelve sus opciones y recuerda cuál es la correcta
-  function prepararPregunta(p, nombreMateria, materiaId) {
-    var orden = p.o.map(function (texto, i) { return { texto: texto, correcta: i === p.a }; });
-    orden = revolver(orden);
+  // Prepara una pregunta para mostrarla (revuelve opciones, etc.)
+  function prepararPregunta(p, m) {
+    var tipo = Tipos.de(p);
     return {
+      orig: p, m: m,
+      tipo: p.tipo || "opcion",
       tema: p.t,
-      materia: nombreMateria,
+      materia: m.nombre,
       pregunta: p.q,
-      opciones: orden.map(function (x) { return x.texto; }),
-      correcta: orden.findIndex(function (x) { return x.correcta; }),
       explicacion: p.e,
-      clave: claveDe(p, materiaId)
+      datos: tipo.preparar(p),
+      clave: claveDe(p, m.id)
     };
   }
+  function preparar(lista, m) { return lista.map(function (p) { return prepararPregunta(p, m); }); }
+  function todasPreparadas(filtro) {
+    var r = [];
+    materias.forEach(function (m) {
+      m.preguntas.forEach(function (p) { if (!filtro || filtro(p)) r.push(prepararPregunta(p, m)); });
+    });
+    return r;
+  }
 
-  // ---------- Guardar mejores puntajes (opcional, solo en este navegador) ----------
+  // ---------- Mejores puntajes (en este navegador y en la cuenta) ----------
   function leerRecordsLocales() {
     try { return JSON.parse(localStorage.getItem("excoba-records") || "{}"); } catch (e) { return {}; }
   }
-  // Si hay sesión, se combinan los de este navegador con los guardados en la cuenta
   function leerRecords() {
     var r = leerRecordsLocales();
     if (nube.activa) r = combinarRecords(r, nube.records);
@@ -103,7 +124,7 @@
   function guardarRecord(clave, porcentaje) {
     try {
       var r = leerRecords();
-      if (!r[clave] || porcentaje > r[clave]) { r[clave] = porcentaje; }
+      if (!r[clave] || porcentaje > r[clave]) r[clave] = porcentaje;
       localStorage.setItem("excoba-records", JSON.stringify(r));
     } catch (e) { /* si el navegador no deja guardar, no pasa nada */ }
   }
@@ -113,46 +134,37 @@
     var cont = $("lista-materias");
     cont.innerHTML = "";
     var records = leerRecords();
-    var total = 0;
+    var total = 0, formato = 0;
 
     materias.forEach(function (m) {
       total += m.preguntas.length;
-      var btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "materia-btn";
-
-      var icono = document.createElement("span");
-      icono.className = "materia-icono";
-      icono.textContent = m.icono;
-
-      var textos = document.createElement("span");
-      var nombre = document.createElement("span");
-      nombre.className = "materia-nombre";
-      nombre.textContent = m.nombre;
-      var info = document.createElement("span");
-      info.className = "materia-info";
+      var nf = m.preguntas.filter(esFormatoExamen).length;
+      formato += nf;
+      var btn = el("button", "materia-btn"); btn.type = "button";
+      btn.appendChild(el("span", "materia-icono", m.icono));
+      var textos = el("span");
+      textos.appendChild(el("span", "materia-nombre", m.nombre));
       var rec = records[m.id];
-      info.textContent = m.preguntas.length + " preguntas" + (rec !== undefined ? " · mejor: " + rec + "%" : "");
-      textos.appendChild(nombre);
-      textos.appendChild(info);
-
-      btn.appendChild(icono);
+      textos.appendChild(el("span", "materia-info",
+        m.preguntas.length + " preguntas" + (nf ? " · " + nf + " tipo examen" : "") + (rec !== undefined ? " · mejor: " + rec + "%" : "")));
       btn.appendChild(textos);
       btn.addEventListener("click", function () { abrirMateria(m); });
       cont.appendChild(btn);
     });
 
-    $("total-preguntas").textContent = "Banco total: " + total + " preguntas de " + materias.length + " materias.";
+    $("total-preguntas").textContent = "Banco total: " + total + " preguntas de " + materias.length +
+      " materias (" + formato + " con el formato del examen real).";
+    var rs = records["simulacro"];
+    $("simulacro-record").textContent = rs !== undefined ? "Tu mejor simulacro: " + rs + "%" + (rs >= META ? " ✅" : " (meta: " + META + "%)") : "";
   }
 
   // ---------- Pantalla de una materia (elegir tema) ----------
   function abrirMateria(m) {
     $("materia-titulo").textContent = m.icono + " " + m.nombre;
-    $("materia-resumen").textContent = m.preguntas.length + " preguntas en total.";
+    var nf = m.preguntas.filter(esFormatoExamen).length;
+    $("materia-resumen").textContent = m.preguntas.length + " preguntas en total" + (nf ? " (" + nf + " con formato de examen)." : ".");
 
-    // Agrupar por tema, respetando el orden en que aparecen
-    var temas = [];
-    var conteo = {};
+    var temas = [], conteo = {};
     m.preguntas.forEach(function (p) {
       if (!conteo[p.t]) { conteo[p.t] = 0; temas.push(p.t); }
       conteo[p.t]++;
@@ -161,21 +173,16 @@
     var cont = $("lista-temas");
     cont.innerHTML = "";
     temas.forEach(function (t) {
-      var btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "tema-btn";
-      var nombre = document.createElement("span");
-      nombre.textContent = t;
-      var num = document.createElement("span");
-      num.className = "tema-num";
-      num.textContent = conteo[t];
-      btn.appendChild(nombre);
-      btn.appendChild(num);
+      var btn = el("button", "tema-btn"); btn.type = "button";
+      btn.appendChild(el("span", "", t));
+      btn.appendChild(el("span", "tema-num", String(conteo[t])));
       btn.addEventListener("click", function () { iniciarMateria(m, t); });
       cont.appendChild(btn);
     });
 
     $("btn-empezar-materia").onclick = function () { iniciarMateria(m, null); };
+    $("btn-formato-materia").classList.toggle("oculto", !nf);
+    $("btn-formato-materia").onclick = function () { iniciarFormatoMateria(m); };
     mostrar("pantalla-materia");
   }
 
@@ -183,18 +190,17 @@
   function iniciarMateria(m, tema) {
     var lista = m.preguntas.filter(function (p) { return !tema || p.t === tema; });
     var titulo = tema ? m.nombre + " · " + tema : m.nombre;
-    var preparadas = lista.map(function (p) { return prepararPregunta(p, m.nombre, m.id); });
-    // Si eligió un tema, se muestran todas las de ese tema
-    empezar(titulo, preparadas, !tema, { tipo: "materia", materiaId: m.id, tema: tema });
+    empezar(titulo, preparar(lista, m), !tema, { tipo: "materia", materiaId: m.id, tema: tema });
   }
-
+  function iniciarFormatoMateria(m) {
+    empezar(m.nombre + " · formato examen", preparar(m.preguntas.filter(esFormatoExamen), m), true,
+      { tipo: "formato", materiaId: m.id }, false);
+  }
   function iniciarMixto() {
-    var todas = [];
-    materias.forEach(function (m) {
-      m.preguntas.forEach(function (p) { todas.push(prepararPregunta(p, m.nombre, m.id)); });
-    });
-    // El examen mixto siempre se revuelve para que salgan materias variadas
-    empezar("Examen mixto", revolver(todas), true, { tipo: "mixto" }, true);
+    empezar("Examen mixto", revolver(todasPreparadas()), true, { tipo: "mixto" }, true);
+  }
+  function iniciarFormato() {
+    empezar("Práctica formato examen", revolver(todasPreparadas(esFormatoExamen)), true, { tipo: "formato" }, true);
   }
 
   function empezar(titulo, preguntas, recortar, origen, yaRevuelto) {
@@ -202,176 +208,249 @@
     if (revolverActivo() && !yaRevuelto) lista = revolver(lista);
     var n = cantidadElegida();
     if (recortar && n > 0) lista = lista.slice(0, n);
+    arrancar("practica", titulo, lista, origen);
+  }
 
+  function arrancar(modo, titulo, lista, origen) {
+    detenerReloj();
+    estado.modo = modo;
     estado.titulo = titulo;
     estado.preguntas = lista;
-    estado.indice = 0;
-    estado.aciertos = 0;
-    estado.errores = [];
-    estado.acertadas = [];
+    estado.cola = lista.map(function (_, i) { return i; });
+    estado.pos = 0;
+    estado.puntos = 0;
+    estado.respuestas = lista.map(function () { return null; });
+    estado.notas = lista.map(function () { return null; });
     estado.origen = origen;
-
+    $("pantalla-quiz").classList.toggle("modo-simulacro", modo === "simulacro");
+    if (modo === "simulacro") iniciarReloj(lista.length * 60);
+    else $("reloj").classList.add("oculto");
     mostrar("pantalla-quiz");
     pintarPregunta();
   }
 
+  // ---------- Simulacro ----------
+  // Proporciones parecidas al examen real (primaria + secundaria + bachillerato)
+  var REPARTO = [
+    { ids: ["espanol"], peso: 0.22 },
+    { ids: ["matematicas"], peso: 0.33 },
+    { ids: ["biologia"], peso: 0.11 },
+    { ids: ["quimica"], peso: 0.11 },
+    { ids: ["fisica"], peso: 0.11 },
+    { ids: ["historia_universal", "historia_mexico", "geografia"], peso: 0.12 }
+  ];
+  function iniciarSimulacro() {
+    var n = parseInt($("sel-simulacro").value, 10) || 30;
+    var elegidas = [];
+    REPARTO.forEach(function (grupo, gi) {
+      var cuantas = gi === REPARTO.length - 1 ? n - elegidas.length : Math.round(n * grupo.peso);
+      var pool = [];
+      grupo.ids.forEach(function (id) { var m = buscarMateria(id); if (m) pool = pool.concat(preparar(m.preguntas, m)); });
+      // La mitad (o lo que haya) con formato de examen real, el resto de opción múltiple
+      var formato = revolver(pool.filter(function (x) { return x.tipo !== "opcion"; }));
+      var opcion = revolver(pool.filter(function (x) { return x.tipo === "opcion"; }));
+      var deFormato = Math.min(formato.length, Math.ceil(cuantas / 2));
+      elegidas = elegidas.concat(formato.slice(0, deFormato), opcion.slice(0, cuantas - deFormato));
+    });
+    arrancar("simulacro", "Simulacro EXCOBA (" + n + " preguntas)", revolver(elegidas), { tipo: "simulacro" });
+  }
+  function iniciarReloj(segundos) {
+    estado.fin = Date.now() + segundos * 1000;
+    $("reloj").classList.remove("oculto");
+    tic();
+    estado.reloj = setInterval(tic, 1000);
+  }
+  function detenerReloj() { if (estado.reloj) { clearInterval(estado.reloj); estado.reloj = null; } }
+  function tic() {
+    var resta = Math.max(0, Math.round((estado.fin - Date.now()) / 1000));
+    var m = Math.floor(resta / 60), s = resta % 60;
+    $("reloj").textContent = "⏱ " + m + ":" + (s < 10 ? "0" : "") + s;
+    $("reloj").classList.toggle("poco-tiempo", resta <= 120);
+    if (resta === 0) {
+      detenerReloj();
+      alert("⏰ Se acabó el tiempo. Las preguntas sin contestar valen 0, igual que en el examen.");
+      pintarResultados();
+    }
+  }
+
   // ---------- Pintar una pregunta ----------
+  function actual() { return estado.preguntas[estado.cola[estado.pos]]; }
+
   function pintarPregunta() {
-    var p = estado.preguntas[estado.indice];
+    var p = actual();
+    var tipo = Tipos.de(p.orig);
     var total = estado.preguntas.length;
+    var simulacro = estado.modo === "simulacro";
     estado.respondida = false;
 
-    $("contador").textContent = "Pregunta " + (estado.indice + 1) + " de " + total;
-    $("puntos").textContent = "✔ " + estado.aciertos;
-    $("barra").style.width = (estado.indice / total * 100) + "%";
+    $("contador").textContent = "Pregunta " + (estado.pos + 1) + " de " + total;
+    $("puntos").textContent = simulacro ? "" : "✔ " + redondear(estado.puntos);
+    $("barra").style.width = (estado.pos / total * 100) + "%";
     $("etiqueta-tema").textContent = (estado.origen && estado.origen.tipo === "materia" ? "" : p.materia + " · ") + p.tema;
+    $("etiqueta-tipo").textContent = Tipos.nombre(p.tipo);
+    $("etiqueta-tipo").classList.toggle("oculto", p.tipo === "opcion");
     $("texto-pregunta").textContent = p.pregunta;
+    $("instruccion").textContent = p.tipo === "opcion" ? "" : tipo.instruccion;
+    $("instruccion").classList.toggle("oculto", p.tipo === "opcion");
 
-    var cont = $("opciones");
+    var cont = $("zona-respuesta");
     cont.innerHTML = "";
-    p.opciones.forEach(function (texto, i) {
-      var btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "opcion";
-      var letra = document.createElement("span");
-      letra.className = "opcion-letra";
-      letra.textContent = LETRAS[i];
-      var span = document.createElement("span");
-      span.textContent = texto;
-      btn.appendChild(letra);
-      btn.appendChild(span);
-      btn.addEventListener("click", function () { responder(i); });
-      cont.appendChild(btn);
-    });
+    delete cont.dataset.elegida;
+    delete cont.dataset.orden;
+    cont.className = "zona-respuesta tipo-" + p.tipo;
+    // En práctica, las de opción múltiple se califican al tocarlas (como siempre)
+    var instantanea = !simulacro && p.tipo === "opcion";
+    tipo.pintar(p.datos, cont, instantanea ? function () { comprobar(); } : null);
 
     $("retro").classList.add("oculto");
     $("explicacion").classList.add("oculto");
     $("btn-explicacion").setAttribute("aria-expanded", "false");
     $("btn-explicacion").textContent = "💡 Ver procedimiento";
-    $("btn-siguiente").disabled = true;
-    $("btn-siguiente").textContent = estado.indice === total - 1 ? "Ver resultados" : "Siguiente →";
+
+    var ultima = estado.pos === estado.cola.length - 1;
+    $("btn-comprobar").classList.toggle("oculto", simulacro || instantanea);
+    $("btn-comprobar").disabled = false;
+    $("btn-saltar").classList.toggle("oculto", !simulacro || ultima);
+    $("btn-siguiente").disabled = !simulacro;
+    $("btn-siguiente").textContent = ultima ? (simulacro ? "Terminar examen" : "Ver resultados") : "Siguiente →";
+    $("btn-siguiente").classList.toggle("oculto", !simulacro && !instantanea);
   }
 
-  // ---------- Responder ----------
-  function responder(elegida) {
+  // ---------- Comprobar (modo práctica) ----------
+  function comprobar() {
     if (estado.respondida) return;
+    var p = actual(), tipo = Tipos.de(p.orig), cont = $("zona-respuesta");
+    var r = tipo.leer(p.datos, cont);
+    if (r === null) { avisoVacio(); return; }
+    var nota = tipo.calificar(p.datos, r);
+    var i = estado.cola[estado.pos];
+    estado.respuestas[i] = r;
+    estado.notas[i] = nota;
+    estado.puntos += nota;
     estado.respondida = true;
-    var p = estado.preguntas[estado.indice];
-    var botones = $("opciones").querySelectorAll(".opcion");
-
-    botones.forEach(function (b, i) {
-      b.disabled = true;
-      if (i === p.correcta) b.classList.add("correcta");
-      if (i === elegida && i !== p.correcta) b.classList.add("incorrecta");
-    });
+    tipo.corregir(p.datos, cont, r);
 
     var retro = $("retro-texto");
-    if (elegida === p.correcta) {
-      estado.aciertos++;
-      estado.acertadas.push(p.clave);
-      retro.textContent = "¡Correcto! 🎉";
-      retro.className = "retro-texto bien";
+    if (nota === 1) { retro.textContent = "¡Correcto! 🎉"; retro.className = "retro-texto bien"; }
+    else if (nota > 0) {
+      retro.textContent = "Casi: " + Math.round(nota * 100) + "% bien (" + redondear(nota) + " de 1 punto). En verde lo correcto, en rojo lo que falló.";
+      retro.className = "retro-texto parcial";
     } else {
-      estado.errores.push({ p: p, elegida: elegida });
-      retro.textContent = "Incorrecto. La respuesta correcta es la " + LETRAS[p.correcta] + ".";
+      retro.textContent = p.tipo === "opcion" ? "Incorrecto. La respuesta correcta está en verde." : "Incorrecto. Respuesta correcta: " + tipo.textoCorrecta(p.datos);
       retro.className = "retro-texto mal";
     }
-
-    // Texto de la explicación
-    var exp = $("explicacion");
-    exp.innerHTML = "";
-    var titulo = document.createElement("strong");
-    titulo.textContent = "¿Cómo se resuelve?";
-    var cuerpo = document.createElement("div");
-    cuerpo.textContent = p.explicacion;
-    exp.appendChild(titulo);
-    exp.appendChild(cuerpo);
+    pintarExplicacion(p);
+    if (nota < 1) { $("explicacion").classList.remove("oculto"); marcarExplicacion(true); }
 
     $("retro").classList.remove("oculto");
-    $("puntos").textContent = "✔ " + estado.aciertos;
+    $("puntos").textContent = "✔ " + redondear(estado.puntos);
+    $("btn-comprobar").classList.add("oculto");
+    $("btn-siguiente").classList.remove("oculto");
     $("btn-siguiente").disabled = false;
     $("btn-siguiente").focus();
   }
-
-  function alternarExplicacion() {
+  function avisoVacio() {
+    var retro = $("retro-texto");
+    retro.textContent = "Primero contesta la pregunta 🙂";
+    retro.className = "retro-texto mal";
+    $("retro").classList.remove("oculto");
+    $("btn-explicacion").classList.add("oculto");
+    setTimeout(function () { if (!estado.respondida) $("retro").classList.add("oculto"); $("btn-explicacion").classList.remove("oculto"); }, 1800);
+  }
+  function pintarExplicacion(p) {
     var exp = $("explicacion");
-    var abierta = exp.classList.toggle("oculto") === false;
+    exp.innerHTML = "";
+    exp.appendChild(el("strong", "", "¿Cómo se resuelve?"));
+    exp.appendChild(el("div", "", p.explicacion));
+  }
+  function marcarExplicacion(abierta) {
     $("btn-explicacion").setAttribute("aria-expanded", abierta ? "true" : "false");
     $("btn-explicacion").textContent = abierta ? "🙈 Ocultar procedimiento" : "💡 Ver procedimiento";
   }
+  function alternarExplicacion() {
+    var abierta = $("explicacion").classList.toggle("oculto") === false;
+    marcarExplicacion(abierta);
+  }
 
+  // ---------- Avanzar ----------
   function siguiente() {
-    if (!estado.respondida) return;
-    if (estado.indice < estado.preguntas.length - 1) {
-      estado.indice++;
+    if (estado.modo === "simulacro") {
+      // Guarda la respuesta (aunque esté vacía) sin decir si está bien
+      var p = actual(), tipo = Tipos.de(p.orig);
+      var r = tipo.leer(p.datos, $("zona-respuesta"));
+      var i = estado.cola[estado.pos];
+      estado.respuestas[i] = r;
+      estado.notas[i] = r === null ? 0 : tipo.calificar(p.datos, r);
+    } else if (!estado.respondida) return;
+
+    if (estado.pos < estado.cola.length - 1) {
+      estado.pos++;
       pintarPregunta();
       window.scrollTo(0, 0);
     } else {
       pintarResultados();
     }
   }
+  // Simulacro: dejar para después (se manda al final de la fila)
+  function saltar() {
+    var i = estado.cola.splice(estado.pos, 1)[0];
+    estado.cola.push(i);
+    pintarPregunta();
+    window.scrollTo(0, 0);
+  }
 
   // ---------- Resultados ----------
   function pintarResultados() {
+    detenerReloj();
     var total = estado.preguntas.length;
-    var pct = total ? Math.round(estado.aciertos / total * 100) : 0;
+    var simulacro = estado.modo === "simulacro";
+    if (simulacro) estado.puntos = estado.notas.reduce(function (s, n) { return s + (n || 0); }, 0);
+    var puntos = redondear(estado.puntos);
+    var pct = total ? Math.round(estado.puntos / total * 100) : 0;
     $("barra").style.width = "100%";
 
     var emoji, mensaje;
     if (pct >= 90) { emoji = "🏆"; mensaje = "¡Excelente! Dominas este tema."; }
-    else if (pct >= 70) { emoji = "😎"; mensaje = "¡Muy bien! Repasa las que fallaste y quedas perfecto."; }
-    else if (pct >= 50) { emoji = "💪"; mensaje = "Vas bien. Revisa los procedimientos de las que fallaste."; }
-    else { emoji = "📖"; mensaje = "Toca repasar este tema. Lee las explicaciones y vuelve a intentarlo."; }
+    else if (pct >= META) { emoji = "😎"; mensaje = "¡Muy bien! Pasaste la meta de " + META + ". Repasa las que fallaste y quedas perfecto."; }
+    else if (pct >= 50) { emoji = "💪"; mensaje = "Vas bien, te faltan " + (META - pct) + " puntos para la meta de " + META + ". Revisa los procedimientos de las que fallaste."; }
+    else { emoji = "📖"; mensaje = "Toca repasar. Lee las explicaciones de abajo y vuelve a intentarlo."; }
+    if (simulacro) {
+      var sin = estado.notas.filter(function (n, i) { return estado.respuestas[i] === null; }).length;
+      if (sin) mensaje += " Dejaste " + sin + " sin contestar: en el examen real mejor contesta todas, no se resta por equivocarte.";
+    }
 
     $("resultado-emoji").textContent = emoji;
     $("resultado-titulo").textContent = estado.titulo;
-    $("resultado-score").textContent = estado.aciertos + " / " + total + "  (" + pct + "%)";
+    $("resultado-score").textContent = puntos + " / " + total + "  (" + pct + "%)";
     $("resultado-mensaje").textContent = mensaje;
 
-    var esRecord = estado.origen && estado.origen.tipo === "materia" && !estado.origen.tema;
-    if (esRecord) guardarRecord(estado.origen.materiaId, pct);
-    guardarEnNube(esRecord ? estado.origen.materiaId : null, pct, total);
+    var o = estado.origen || {};
+    var claveRecord = (o.tipo === "materia" && !o.tema) ? o.materiaId : (simulacro ? "simulacro" : null);
+    if (claveRecord) guardarRecord(claveRecord, pct);
+    pintarDesglose();
 
-    var hayErrores = estado.errores.length > 0;
-    $("btn-repasar").classList.toggle("oculto", !hayErrores);
-    $("titulo-errores").classList.toggle("oculto", !hayErrores);
+    var errores = [];
+    estado.preguntas.forEach(function (p, i) { if ((estado.notas[i] || 0) < 1) errores.push({ p: p, r: estado.respuestas[i], nota: estado.notas[i] || 0 }); });
+    estado.errores = errores;
+    guardarEnNube(claveRecord, pct, total);
+
+    $("btn-repasar").classList.toggle("oculto", !errores.length);
+    $("titulo-errores").classList.toggle("oculto", !errores.length);
+    $("titulo-errores").textContent = simulacro ? "Revisión: preguntas que fallaste" : "Preguntas que fallaste";
 
     var cont = $("lista-errores");
     cont.innerHTML = "";
-    estado.errores.forEach(function (err) {
-      var p = err.p;
-      var card = document.createElement("div");
-      card.className = "card error-item";
-
-      var tag = document.createElement("span");
-      tag.className = "etiqueta";
-      tag.textContent = p.materia + " · " + p.tema;
-
-      var q = document.createElement("p");
-      q.className = "pregunta";
-      q.textContent = p.pregunta;
-
-      var tu = document.createElement("p");
-      tu.className = "error-linea tu";
-      tu.textContent = "✗ Tu respuesta: " + p.opciones[err.elegida];
-
-      var ok = document.createElement("p");
-      ok.className = "error-linea ok";
-      ok.textContent = "✔ Correcta: " + p.opciones[p.correcta];
-
-      var det = document.createElement("details");
-      var sum = document.createElement("summary");
-      sum.textContent = "💡 Ver procedimiento";
-      var exp = document.createElement("div");
-      exp.className = "explicacion";
-      exp.textContent = p.explicacion;
-      det.appendChild(sum);
-      det.appendChild(exp);
-
-      card.appendChild(tag);
-      card.appendChild(q);
-      card.appendChild(tu);
-      card.appendChild(ok);
+    errores.forEach(function (err) {
+      var p = err.p, tipo = Tipos.de(p.orig);
+      var card = el("div", "card error-item");
+      card.appendChild(el("span", "etiqueta", p.materia + " · " + p.tema));
+      if (p.tipo !== "opcion") card.appendChild(el("span", "etiqueta etiqueta-tipo", Tipos.nombre(p.tipo)));
+      card.appendChild(el("p", "pregunta", p.pregunta));
+      card.appendChild(el("p", "error-linea tu", (err.nota > 0 ? "◐ Parcial (" + redondear(err.nota) + " pts): " : "✗ Tu respuesta: ") + tipo.textoTuya(p.datos, err.r)));
+      card.appendChild(el("p", "error-linea ok", "✔ Correcta: " + tipo.textoCorrecta(p.datos)));
+      var det = el("details");
+      det.appendChild(el("summary", "", "💡 Ver procedimiento"));
+      det.appendChild(el("div", "explicacion", p.explicacion));
       card.appendChild(det);
       cont.appendChild(card);
     });
@@ -379,30 +458,50 @@
     mostrar("pantalla-resultados");
   }
 
-  function repasarErrores() {
-    var falladas = estado.errores.map(function (e) {
-      // Volver a revolver las opciones de cada pregunta fallada
-      var p = e.p;
-      var orden = p.opciones.map(function (t, i) { return { texto: t, correcta: i === p.correcta }; });
-      orden = revolver(orden);
-      return {
-        tema: p.tema, materia: p.materia, pregunta: p.pregunta, explicacion: p.explicacion, clave: p.clave,
-        opciones: orden.map(function (x) { return x.texto; }),
-        correcta: orden.findIndex(function (x) { return x.correcta; })
-      };
+  // Calificación por materia (para ver dónde estás flojo)
+  function pintarDesglose() {
+    var cont = $("desglose");
+    cont.innerHTML = "";
+    var por = {}, orden = [];
+    estado.preguntas.forEach(function (p, i) {
+      if (!por[p.materia]) { por[p.materia] = { pts: 0, n: 0 }; orden.push(p.materia); }
+      por[p.materia].pts += estado.notas[i] || 0;
+      por[p.materia].n++;
     });
-    var origen = { tipo: "repaso" };
-    empezar("Repaso de errores", falladas, false, origen);
+    if (orden.length < 2) { cont.classList.add("oculto"); return; }
+    cont.classList.remove("oculto");
+    cont.appendChild(el("strong", "", "Tu calificación por materia"));
+    orden.sort(function (a, b) { return por[a].pts / por[a].n - por[b].pts / por[b].n; });
+    orden.forEach(function (nombre) {
+      var d = por[nombre], pct = Math.round(d.pts / d.n * 100);
+      var fila = el("div", "desglose-fila");
+      fila.appendChild(el("span", "desglose-nombre", nombre));
+      var barra = el("span", "desglose-barra");
+      var relleno = el("span", "desglose-relleno");
+      relleno.style.width = pct + "%";
+      relleno.classList.add(pct >= META ? "bien" : (pct >= 50 ? "medio" : "mal"));
+      barra.appendChild(relleno);
+      fila.appendChild(barra);
+      fila.appendChild(el("span", "desglose-pct", redondear(d.pts) + "/" + d.n + " · " + pct + "%"));
+      cont.appendChild(fila);
+    });
+    cont.appendChild(el("p", "muted desglose-nota", "Empieza a estudiar por las de arriba: son las que más puntos te pueden subir."));
   }
 
+  function repasarErrores() {
+    var lista = estado.errores.map(function (e) { return prepararPregunta(e.p.orig, e.p.m); });
+    empezar("Repaso de errores", lista, false, { tipo: "repaso", lista: lista.map(function (x) { return { p: x.orig, m: x.m }; }) });
+  }
   function otraRonda() {
-    var o = estado.origen;
-    if (o && o.tipo === "materia") {
-      var m = buscarMateria(o.materiaId);
-      if (m) { iniciarMateria(m, o.tema); return; }
+    var o = estado.origen || {};
+    if (o.tipo === "materia") { var m = buscarMateria(o.materiaId); if (m) { iniciarMateria(m, o.tema); return; } }
+    if (o.tipo === "formato" && o.materiaId) { var mf = buscarMateria(o.materiaId); if (mf) { iniciarFormatoMateria(mf); return; } }
+    if (o.tipo === "formato") { iniciarFormato(); return; }
+    if (o.tipo === "simulacro") { iniciarSimulacro(); return; }
+    if (o.tipo === "repaso" && o.lista) {
+      empezar("Repaso de errores", o.lista.map(function (x) { return prepararPregunta(x.p, x.m); }), false, o); return;
     }
-    if (o && o.tipo === "repaso") { repasarErrores(); return; }
-    if (o && o.tipo === "guardadas") { repasarGuardadas(); return; }
+    if (o.tipo === "guardadas") { repasarGuardadas(); return; }
     iniciarMixto();
   }
 
@@ -415,12 +514,14 @@
     // Las que falló se agregan a "por repasar"; las que contestó bien se quitan
     var pendientes = {};
     nube.falladas.forEach(function (k) { pendientes[k] = true; });
-    estado.errores.forEach(function (e) { if (e.p.clave) pendientes[e.p.clave] = true; });
-    estado.acertadas.forEach(function (k) { delete pendientes[k]; });
+    estado.preguntas.forEach(function (p, i) {
+      if (estado.notas[i] === null) return;
+      if (estado.notas[i] < 1) pendientes[p.clave] = true; else delete pendientes[p.clave];
+    });
     nube.falladas = Object.keys(pendientes).filter(function (k) { return indice[k]; });
 
     var records = combinarRecords(leerRecordsLocales(), nube.records);
-    Cuenta.guardarIntento(estado.titulo, estado.aciertos, total)
+    Cuenta.guardarIntento(estado.titulo, Math.round(estado.puntos), total)
       .then(function () { return Cuenta.guardarProgreso(records, nube.falladas); })
       .catch(function (e) {
         console.warn("No se pudo guardar el avance:", e);
@@ -452,21 +553,16 @@
     Cuenta.historial(5).then(function (filas) {
       cont.innerHTML = "";
       if (!filas.length) return;
-      var t = document.createElement("strong");
-      t.textContent = "Últimas rondas";
+      var t = el("strong", "", "Últimas rondas");
       t.style.fontSize = ".9rem";
       cont.appendChild(t);
       filas.forEach(function (f) {
-        var fila = document.createElement("div");
-        fila.className = "historial-fila";
-        var a = document.createElement("span");
+        var fila = el("div", "historial-fila");
         var fecha = new Date(f.created_at);
-        a.textContent = f.titulo + " · " + fecha.toLocaleDateString("es-MX", { day: "numeric", month: "short" });
-        var b = document.createElement("span");
-        b.className = "historial-pct";
-        b.textContent = f.aciertos + "/" + f.total + " (" + f.porcentaje + "%)";
-        b.style.color = f.porcentaje >= 70 ? "var(--ok)" : (f.porcentaje >= 50 ? "var(--text)" : "var(--bad)");
-        fila.appendChild(a); fila.appendChild(b);
+        fila.appendChild(el("span", "", f.titulo + " · " + fecha.toLocaleDateString("es-MX", { day: "numeric", month: "short" })));
+        var b = el("span", "historial-pct", f.aciertos + "/" + f.total + " (" + f.porcentaje + "%)");
+        b.style.color = f.porcentaje >= META ? "var(--ok)" : (f.porcentaje >= 50 ? "var(--text)" : "var(--bad)");
+        fila.appendChild(b);
         cont.appendChild(fila);
       });
     }).catch(function () {});
@@ -482,7 +578,6 @@
       nube.records = (d && d.records) || {};
       nube.falladas = ((d && d.falladas) || []).filter(function (k) { return indice[k]; });
       nube.activa = true;
-      // Sube a la cuenta los récords que ya tenía en este navegador
       var combinados = combinarRecords(leerRecordsLocales(), nube.records);
       if (!d || JSON.stringify(combinados) !== JSON.stringify(nube.records)) {
         nube.records = combinados;
@@ -498,25 +593,23 @@
 
   function repasarGuardadas() {
     var lista = nube.falladas.map(function (k) { return indice[k]; }).filter(Boolean)
-      .map(function (x) { return prepararPregunta(x.p, x.m.nombre, x.m.id); });
+      .map(function (x) { return prepararPregunta(x.p, x.m); });
     if (!lista.length) { irInicio(); return; }
-    empezar("Mis preguntas falladas", revolver(lista), false, { tipo: "guardadas" }, true);
+    arrancar("practica", "Mis preguntas falladas", revolver(lista), { tipo: "guardadas" });
   }
 
   // ---------- Pantalla de login ----------
   var modoRegistro = false;
   function abrirLogin() {
     if (Cuenta.usuario()) {
-      if (confirm("¿Cerrar sesión de " + Cuenta.usuario().email + "?")) {
-        Cuenta.salir().then(irInicio);
-      }
+      if (confirm("¿Cerrar sesión de " + Cuenta.usuario().email + "?")) Cuenta.salir().then(irInicio);
       return;
     }
     cambiarModo(false);
     mostrar("pantalla-login");
     $("login-correo").focus();
   }
-  function cambiarModo(registro, conservarMensaje) {
+  function cambiarModo(registro) {
     modoRegistro = registro;
     $("tab-entrar").classList.toggle("activa", !registro);
     $("tab-registro").classList.toggle("activa", registro);
@@ -524,13 +617,13 @@
     $("tab-registro").setAttribute("aria-selected", registro ? "true" : "false");
     $("btn-login-enviar").textContent = registro ? "Crear cuenta" : "Entrar";
     $("login-clave").setAttribute("autocomplete", registro ? "new-password" : "current-password");
-    if (!conservarMensaje) mensajeLogin("", "");
+    mensajeLogin("", "");
   }
   function mensajeLogin(texto, tipo) {
-    var el = $("login-msg");
-    el.textContent = texto;
-    el.className = "login-msg " + tipo;
-    el.classList.toggle("oculto", !texto);
+    var e = $("login-msg");
+    e.textContent = texto;
+    e.className = "login-msg " + tipo;
+    e.classList.toggle("oculto", !texto);
   }
   function enviarLogin(ev) {
     ev.preventDefault();
@@ -538,13 +631,11 @@
     var clave = $("login-clave").value;
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) { mensajeLogin("Escribe un correo válido.", "error"); return; }
     if (clave.length < 6) { mensajeLogin("La contraseña debe tener al menos 6 caracteres.", "error"); return; }
-
     var btn = $("btn-login-enviar");
     btn.disabled = true;
     btn.textContent = "Un momento…";
     var eraRegistro = modoRegistro;
-    var accion = eraRegistro ? Cuenta.registrar(correo, clave) : Cuenta.entrar(correo, clave);
-    accion.then(function (r) {
+    (eraRegistro ? Cuenta.registrar(correo, clave) : Cuenta.entrar(correo, clave)).then(function (r) {
       if (eraRegistro && r && r.necesitaConfirmar) {
         cambiarModo(false);
         mensajeLogin("¡Cuenta creada! Te mandamos un correo a " + correo + ". Abre el enlace para confirmarla y luego inicia sesión aquí.", "info");
@@ -561,24 +652,51 @@
   }
 
   function irInicio() {
+    detenerReloj();
     pintarInicio();
     pintarProgreso();
     mostrar("pantalla-inicio");
   }
 
+  // ---------- Formulario (como el del examen) ----------
+  function abrirFormulario() {
+    var d = $("dlg-formulario");
+    if (d.showModal) d.showModal(); else d.setAttribute("open", "");
+  }
+  function cerrarFormulario() {
+    var d = $("dlg-formulario");
+    if (d.close) d.close(); else d.removeAttribute("open");
+  }
+
   // ---------- Eventos ----------
-  $("btn-inicio").addEventListener("click", irInicio);
+  $("btn-inicio").addEventListener("click", function () {
+    if (!$("pantalla-quiz").classList.contains("oculto") && !confirm("¿Salir al inicio? Se perderá el avance de esta ronda.")) return;
+    irInicio();
+  });
   $("btn-mixto").addEventListener("click", iniciarMixto);
+  $("btn-formato").addEventListener("click", iniciarFormato);
+  $("btn-simulacro").addEventListener("click", iniciarSimulacro);
   $("btn-atras-materia").addEventListener("click", irInicio);
   $("btn-salir").addEventListener("click", function () {
-    if (estado.indice === 0 && !estado.respondida) { irInicio(); return; }
+    var algo = estado.notas.some(function (n) { return n !== null; });
+    if (!algo) { irInicio(); return; }
+    if (estado.modo === "simulacro") {
+      if (confirm("¿Terminar el simulacro ahora? Se calificará lo que llevas.")) pintarResultados();
+      return;
+    }
     if (confirm("¿Seguro que quieres salir? Se perderá el avance de esta ronda.")) irInicio();
   });
   $("btn-explicacion").addEventListener("click", alternarExplicacion);
+  $("btn-comprobar").addEventListener("click", comprobar);
   $("btn-siguiente").addEventListener("click", siguiente);
+  $("btn-saltar").addEventListener("click", saltar);
   $("btn-repasar").addEventListener("click", repasarErrores);
   $("btn-otra-vez").addEventListener("click", otraRonda);
   $("btn-volver-inicio").addEventListener("click", irInicio);
+  $("btn-formulario").addEventListener("click", abrirFormulario);
+  $("btn-formulario-inicio").addEventListener("click", abrirFormulario);
+  $("btn-cerrar-formulario").addEventListener("click", cerrarFormulario);
+  $("dlg-formulario").addEventListener("click", function (ev) { if (ev.target === ev.currentTarget) cerrarFormulario(); });
 
   if (hayCuentas) {
     $("btn-cuenta").classList.remove("oculto");
@@ -592,18 +710,27 @@
     Cuenta.alCambiar(alCambiarUsuario);
   }
 
-  // Atajos de teclado: 1-4 o A-D para responder, Enter para seguir
+  // Atajos de teclado: 1-4 o A-D para opción múltiple, Enter para comprobar/seguir
   document.addEventListener("keydown", function (ev) {
     if ($("pantalla-quiz").classList.contains("oculto")) return;
-    if (ev.target && (ev.target.tagName === "SELECT" || ev.target.tagName === "INPUT")) return;
+    if ($("dlg-formulario").open) return;
+    var enCampo = ev.target && (ev.target.tagName === "SELECT" || ev.target.tagName === "INPUT");
+    var p = actual();
+    if (ev.key === "Enter" && enCampo && ev.target.tagName === "INPUT") {
+      ev.preventDefault();
+      if (estado.modo === "practica" && !estado.respondida) comprobar(); else siguiente();
+      return;
+    }
+    if (enCampo) return;
     var k = ev.key.toUpperCase();
     var idx = "1234".indexOf(k);
     if (idx === -1) idx = "ABCD".indexOf(k);
-    if (idx !== -1 && !estado.respondida) {
-      var p = estado.preguntas[estado.indice];
-      if (idx < p.opciones.length) responder(idx);
-    } else if (ev.key === "Enter" && estado.respondida && document.activeElement === document.body) {
-      siguiente();
+    if (idx !== -1 && !estado.respondida && p.tipo === "opcion") {
+      var b = $("zona-respuesta").querySelectorAll(".opcion")[idx];
+      if (b) b.click();
+    } else if (ev.key === "Enter" && document.activeElement === document.body) {
+      if (estado.modo === "practica" && !estado.respondida && p.tipo !== "opcion") comprobar();
+      else if (estado.respondida || estado.modo === "simulacro") siguiente();
     }
   });
 

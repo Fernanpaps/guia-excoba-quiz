@@ -20,6 +20,22 @@ Cualquier persona con el enlace puede usarla sin cuenta. Si quiere, puede **crea
 
 También se incluyen las preguntas de los exámenes de repaso y de práctica que vienen en la guía.
 
+## Formato del examen real
+
+El EXCOBA no es solo de opción múltiple. Según el instructivo y el demo oficial, se contesta de 4 formas, y la página las practica todas (carpeta `data/examen/`):
+
+| En el examen | En la página | Tipo en los datos |
+|---|---|---|
+| Escritura numérica | Escribes el número (acepta 3.5, 3,5 o 3/4) | `num` |
+| Escritura algebraica | Escribes la expresión (x^2, x^(-2), sqrt(x)); se califica aunque la escribas en otro orden | `alg` |
+| Arrastre de elementos | Clasificar en columnas u ordenar tocando los elementos | `clasificar`, `ordenar` |
+| Selección de elementos | Elegir palabras en un texto o varias opciones correctas | `huecos`, `varias` |
+
+Las preguntas con varias partes se califican parcial, igual que en el examen (si son 4 elementos, cada uno vale 0.25).
+
+- **🎯 Simulacro EXCOBA**: 30, 60, 120 o 180 preguntas con 1 minuto por pregunta. No ves si acertaste hasta el final, puedes saltar preguntas para regresar después y al terminar ves tu calificación por materia (la meta es 70).
+- **📐 Formulario**: las fórmulas que dan en el examen, disponibles en cualquier momento.
+
 ## Cómo se usa
 
 1. Elige cuántas preguntas quieres (10, 20, 40 o todas).
@@ -42,6 +58,14 @@ Cada materia es un archivo dentro de la carpeta `data/`. Cada pregunta se ve as�
 ```
 
 La página revuelve las opciones sola, así que la correcta no siempre sale en la misma letra.
+
+Las preguntas con formato de examen agregan un campo `tipo`. Los ejemplos de cada tipo están al inicio de `tipos.js`. Por ejemplo:
+
+```js
+{ tipo: "num", t: "Porcentajes y regla de 3", q: "¿Cuánto es el 35% de 240?", r: 84, e: "..." },
+{ tipo: "clasificar", t: "Nutrición", q: "Clasifica...", cats: ["Autótrofo", "Heterótrofo"],
+  items: [["Pino", 0], ["León", 1]], e: "..." },
+```
 
 ## Verla en tu computadora
 
