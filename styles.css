@@ -477,3 +477,31 @@ select {
 .fig-tabla { border-collapse: collapse; font-size: .95rem; margin: 0 auto; }
 .fig-tabla th, .fig-tabla td { border: 1px solid var(--border); padding: 6px 12px; text-align: center; }
 .fig-tabla th { background: var(--primary-soft); color: var(--primary); }
+
+/* ===== Lectura, tabla y marcar en el texto ===== */
+.lectura {
+  margin: -4px 0 14px; padding: 12px 14px; border-radius: 10px;
+  background: var(--bg); border-left: 4px solid var(--primary);
+  white-space: pre-line; line-height: 1.6; font-size: .98rem;
+}
+.lectura-chica { font-size: .9rem; margin: 6px 0; }
+.tabla-resp { width: 100%; border-collapse: collapse; }
+.tabla-resp th, .tabla-resp td { border: 1px solid var(--border); padding: 8px; text-align: left; vertical-align: top; }
+.tabla-resp th { background: var(--primary-soft); color: var(--primary); font-size: .9rem; }
+.tabla-etq { font-weight: 700; width: 34%; }
+.tabla-resp .hueco { width: 100%; margin: 0; white-space: normal; }
+.texto-marcar { line-height: 2.2; font-size: 1.05rem; margin: 0; }
+.marca {
+  font: inherit; padding: 1px 4px; margin: 0 1px; border-radius: 6px; cursor: pointer;
+  background: transparent; border: 1px dashed var(--muted); color: var(--text);
+}
+.marca:hover:not(:disabled) { border-color: var(--primary); }
+.marca.elegida { background: var(--primary); color: #fff; border-style: solid; border-color: var(--primary); }
+.marca.correcta { background: var(--ok-soft); border: 2px solid var(--ok); }
+.marca.incorrecta { background: var(--bad-soft); border: 2px solid var(--bad); text-decoration: line-through; }
+.marca.faltante { border: 2px dashed var(--ok); }
+.marca-coma { min-width: 18px; padding: 0 3px; font-weight: 800; color: var(--muted); }
+.marca:disabled { cursor: default; }
+.opcion.tope { animation: tope .4s; }
+@keyframes tope { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+@media (prefers-reduced-motion: reduce) { .opcion.tope { animation: none; } }

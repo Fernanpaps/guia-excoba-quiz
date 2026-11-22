@@ -208,7 +208,7 @@
     instruccion: "Puede haber más de una correcta: selecciona todas las que apliquen.",
     preparar: function (p) {
       var orden = revolver(p.o.map(function (t, i) { return { t: t, ok: p.a.indexOf(i) !== -1 }; }));
-      return { opciones: orden.map(function (x) { return x.t; }), correctas: orden.map(function (x) { return x.ok; }) };
+      return { opciones: orden.map(function (x) { return x.t; }), correctas: orden.map(function (x) { return x.ok; }), max: p.max || 0 };
     },
     pintar: function (prep, cont) {
       prep.opciones.forEach(function (texto) {
@@ -218,6 +218,10 @@
         b.appendChild(el("span", "", texto));
         b.addEventListener("click", function () {
           var on = b.getAttribute("aria-pressed") !== "true";
+          // Si la pregunta pide exactamente N, no deja marcar más
+          if (on && prep.max && cont.querySelectorAll('.opcion[aria-pressed="true"]').length >= prep.max) {
+            b.classList.add("tope"); setTimeout(function () { b.classList.remove("tope"); }, 400); return;
+          }
           b.setAttribute("aria-pressed", on ? "true" : "false");
           b.classList.toggle("elegida", on);
           b.firstChild.textContent = on ? "☑" : "☐";
@@ -516,9 +520,127 @@
     textoCorrecta: function (prep) { return prep.correcto.map(function (t, i) { return (i + 1) + ". " + t; }).join("\n"); }
   };
 
+  // ---------- Tabla: leer un texto y llenar cada fila con la frase correcta ----------
+  //  { tipo:"tabla", lectura:"...", cab:["Pregunta","Respuesta"], filas:[["¿Qué pasó?","frase correcta"],...], extra:["distractor"] }
+  T.tabla = {
+    instruccion: "Lee el texto y, en cada fila, elige la frase que corresponde.",
+    preparar: function (p) {
+      var pool = p.filas.map(function (f) { return f[1]; }).concat(p.extra || []);
+      return { cab: p.cab || ["", "Respuesta"], filas: p.filas.map(function (f) { return { etq: f[0], correcta: f[1] }; }), opciones: revolver(pool) };
+    },
+    pintar: function (prep, cont) {
+      var t = el("table", "tabla-resp");
+      var tr = el("tr");
+      prep.cab.forEach(function (c) { tr.appendChild(el("th", "", c)); });
+      var thead = el("thead"); thead.appendChild(tr); t.appendChild(thead);
+      var tb = el("tbody");
+      prep.filas.forEach(function (f, i) {
+        var fila = el("tr");
+        fila.appendChild(el("td", "tabla-etq", f.etq));
+        var td = el("td"), s = el("select", "hueco");
+        s.setAttribute("aria-label", f.etq);
+        s.appendChild(new Option("Elige…", ""));
+        prep.opciones.forEach(function (o) { s.appendChild(new Option(o, o)); });
+        td.appendChild(s); fila.appendChild(td); tb.appendChild(fila);
+      });
+      t.appendChild(tb);
+      cont.appendChild(t);
+    },
+    leer: function (prep, cont) {
+      var r = [].map.call(cont.querySelectorAll("select"), function (s) { return s.value; });
+      return r.some(Boolean) ? r : null;
+    },
+    calificar: function (prep, r) {
+      if (!r) return 0;
+      var bien = 0; prep.filas.forEach(function (f, i) { if (r[i] === f.correcta) bien++; });
+      return bien / prep.filas.length;
+    },
+    corregir: function (prep, cont, r) {
+      cont.querySelectorAll("select").forEach(function (s, i) {
+        s.disabled = true;
+        var ok = r && r[i] === prep.filas[i].correcta;
+        s.classList.add(ok ? "correcta" : "incorrecta");
+        if (!ok) s.insertAdjacentElement("afterend", el("div", "hueco-correcto", "✔ " + prep.filas[i].correcta));
+      });
+    },
+    textoTuya: function (prep, r) { return r ? prep.filas.map(function (f, i) { return f.etq + " " + (r[i] || "—"); }).join("\n") : "(sin contestar)"; },
+    textoCorrecta: function (prep) { return prep.filas.map(function (f) { return f.etq + " " + f.correcta; }).join("\n"); }
+  };
+
+  // ---------- Marcar en el texto: tocar las palabras o frases que se piden ----------
+  //  texto con fragmentos tocables entre llaves: {fragmento} (no va) y {+fragmento} (sí va).
+  //  Un fragmento {,} o {+,} es un lugar donde podría ir una coma.
+  T.marcar = {
+    instruccion: "Toca en el texto las partes que se piden. Tócalas otra vez para quitarlas.",
+    preparar: function (p) {
+      var partes = [], re = /\{(\+?)([^}]*)\}/g, ult = 0, m;
+      while ((m = re.exec(p.texto))) {
+        if (m.index > ult) partes.push({ t: p.texto.slice(ult, m.index) });
+        partes.push({ t: m[2], ok: m[1] === "+", toca: true });
+        ult = re.lastIndex;
+      }
+      if (ult < p.texto.length) partes.push({ t: p.texto.slice(ult) });
+      return { partes: partes };
+    },
+    pintar: function (prep, cont) {
+      var par = el("p", "texto-marcar");
+      prep.partes.forEach(function (pt, i) {
+        if (!pt.toca) { par.appendChild(document.createTextNode(pt.t)); return; }
+        var coma = pt.t === ",";
+        var b = el("button", "marca" + (coma ? " marca-coma" : ""), coma ? "ˬ" : pt.t);
+        b.type = "button"; b.dataset.i = i; b.setAttribute("aria-pressed", "false");
+        if (coma) b.setAttribute("aria-label", "Lugar para una coma");
+        b.addEventListener("click", function () {
+          var on = b.getAttribute("aria-pressed") !== "true";
+          b.setAttribute("aria-pressed", on ? "true" : "false");
+          b.classList.toggle("elegida", on);
+          if (coma) b.textContent = on ? "," : "ˬ";
+        });
+        par.appendChild(b);
+      });
+      cont.appendChild(par);
+    },
+    leer: function (prep, cont) {
+      var r = {}, alguno = false;
+      cont.querySelectorAll(".marca").forEach(function (b) { var on = b.getAttribute("aria-pressed") === "true"; r[b.dataset.i] = on; if (on) alguno = true; });
+      return alguno ? r : null;
+    },
+    calificar: function (prep, r) {
+      if (!r) return 0;
+      var total = 0, bien = 0, mal = 0;
+      prep.partes.forEach(function (pt, i) {
+        if (!pt.toca) return;
+        if (pt.ok) total++;
+        if (r[i] && pt.ok) bien++;
+        if (r[i] && !pt.ok) mal++;
+      });
+      return Math.max(0, (bien - mal) / (total || 1));
+    },
+    corregir: function (prep, cont, r) {
+      cont.querySelectorAll(".marca").forEach(function (b) {
+        b.disabled = true; b.classList.remove("elegida");
+        var pt = prep.partes[+b.dataset.i], sel = r && r[b.dataset.i];
+        if (pt.ok) { b.classList.add(sel ? "correcta" : "faltante"); if (pt.t === ",") b.textContent = ","; }
+        else if (sel) b.classList.add("incorrecta");
+      });
+    },
+    textoTuya: function (prep, r) {
+      if (!r) return "(sin contestar)";
+      var xs = prep.partes.filter(function (pt, i) { return pt.toca && r[i]; }).map(function (pt) { return pt.t === "," ? "(coma)" : pt.t; });
+      return xs.join(" · ") || "—";
+    },
+    textoCorrecta: function (prep) {
+      if (prep.partes.some(function (pt) { return pt.t === ","; })) {
+        return prep.partes.map(function (pt) { return pt.toca ? (pt.ok ? pt.t : "") : pt.t; }).join("");
+      }
+      return prep.partes.filter(function (pt) { return pt.ok; }).map(function (pt) { return pt.t; }).join(" · ");
+    }
+  };
+
   var NOMBRES = {
     opcion: "Opción múltiple", varias: "Selección de elementos", num: "Escritura numérica",
-    alg: "Escritura algebraica", clasificar: "Arrastre: clasificar", huecos: "Selección en texto", ordenar: "Arrastre: ordenar"
+    alg: "Escritura algebraica", clasificar: "Arrastre: clasificar", huecos: "Selección en texto", ordenar: "Arrastre: ordenar",
+    tabla: "Llenar tabla", marcar: "Selección en el texto"
   };
 
   window.TiposPregunta = {

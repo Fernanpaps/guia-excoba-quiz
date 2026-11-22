@@ -6,7 +6,7 @@
   <title>Guía EXCOBA Quiz</title>
   <meta name="description" content="Cuestionario interactivo para estudiar el examen EXCOBA, con explicación paso a paso de cada pregunta.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=6">
 </head>
 <body>
   <header class="topbar">
@@ -156,6 +156,7 @@
           <button class="btn-formulario" id="btn-formulario" type="button">📐 Formulario</button>
         </div>
         <h2 class="pregunta" id="texto-pregunta"></h2>
+        <div class="lectura oculto" id="lectura"></div>
         <div class="figura oculto" id="figura"></div>
         <p class="instruccion oculto" id="instruccion"></p>
         <div class="zona-respuesta" id="zona-respuesta"></div>
@@ -287,29 +288,30 @@
 
   <!-- Primero el banco, luego las preguntas de cada materia y al final la lógica de la página -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-  <script src="config.js"></script>
-  <script src="cuenta.js"></script>
-  <script src="tipos.js"></script>
-  <script src="errores.js"></script>
-  <script src="figuras.js"></script>
-  <script src="banco.js"></script>
-  <script src="data/espanol.js"></script>
-  <script src="data/matematicas.js"></script>
-  <script src="data/historia_universal.js"></script>
-  <script src="data/geografia_civismo.js"></script>
-  <script src="data/historia_mexico.js"></script>
-  <script src="data/biologia.js"></script>
-  <script src="data/quimica.js"></script>
-  <script src="data/fisica.js"></script>
+  <script src="config.js?v=6"></script>
+  <script src="cuenta.js?v=6"></script>
+  <script src="tipos.js?v=6"></script>
+  <script src="errores.js?v=6"></script>
+  <script src="figuras.js?v=6"></script>
+  <script src="banco.js?v=6"></script>
+  <script src="data/espanol.js?v=6"></script>
+  <script src="data/matematicas.js?v=6"></script>
+  <script src="data/historia_universal.js?v=6"></script>
+  <script src="data/geografia_civismo.js?v=6"></script>
+  <script src="data/historia_mexico.js?v=6"></script>
+  <script src="data/biologia.js?v=6"></script>
+  <script src="data/quimica.js?v=6"></script>
+  <script src="data/fisica.js?v=6"></script>
   <!-- Preguntas con el formato del examen real -->
-  <script src="data/examen/matematicas.js"></script>
-  <script src="data/examen/espanol.js"></script>
-  <script src="data/examen/ciencias.js"></script>
-  <script src="data/examen/sociales.js"></script>
-  <script src="data/examen/figuras.js"></script>
+  <script src="data/examen/matematicas.js?v=6"></script>
+  <script src="data/examen/espanol.js?v=6"></script>
+  <script src="data/examen/ciencias.js?v=6"></script>
+  <script src="data/examen/sociales.js?v=6"></script>
+  <script src="data/examen/figuras.js?v=6"></script>
+  <script src="data/examen/espanol_lectura.js?v=6"></script>
   <!-- Ejercicios con números al azar -->
-  <script src="generadores.js"></script>
-  <script src="generadores_ciencias.js"></script>
-  <script src="app.js"></script>
+  <script src="generadores.js?v=6"></script>
+  <script src="generadores_ciencias.js?v=6"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>

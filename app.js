@@ -95,7 +95,7 @@
   function claveDe(p, materiaId) {
     if (p.gen) return materiaId + ":gen:" + p.gen;
     if (!p.tipo || p.tipo === "opcion") return materiaId + ":" + hashTexto(p.q + "|" + p.o[p.a]);
-    return materiaId + ":" + p.tipo + ":" + hashTexto(p.q + "|" + JSON.stringify(p.r || p.items || p.huecos || p.a || ""));
+    return materiaId + ":" + p.tipo + ":" + hashTexto(p.q + "|" + JSON.stringify(p.r || p.items || p.huecos || p.a || p.filas || p.texto || ""));
   }
 
   // Índice clave → pregunta, para armar el repaso de preguntas guardadas
@@ -346,6 +346,8 @@
     $("etiqueta-nivel").textContent = NIVELES[p.nivel];
     $("etiqueta-nivel").className = "etiqueta etiqueta-nivel nivel-" + p.nivel;
     $("texto-pregunta").textContent = p.pregunta;
+    $("lectura").textContent = p.orig.lectura || "";
+    $("lectura").classList.toggle("oculto", !p.orig.lectura);
     $("figura").classList.toggle("oculto", !window.Figuras || !Figuras.dibujar(p.orig.fig, $("figura")));
     $("instruccion").textContent = p.tipo === "opcion" ? "" : tipo.instruccion;
     $("instruccion").classList.toggle("oculto", p.tipo === "opcion");
@@ -511,6 +513,7 @@
       card.appendChild(el("span", "etiqueta", p.materia + " · " + p.tema));
       if (p.tipo !== "opcion") card.appendChild(el("span", "etiqueta etiqueta-tipo", Tipos.nombre(p.tipo)));
       card.appendChild(el("p", "pregunta", p.pregunta));
+      if (p.orig.lectura) card.appendChild(el("div", "lectura lectura-chica", p.orig.lectura));
       if (p.orig.fig && window.Figuras) { var fg = el("div", "figura figura-chica"); Figuras.dibujar(p.orig.fig, fg); card.appendChild(fg); }
       card.appendChild(el("p", "error-linea tu", (err.nota > 0 ? "◐ Parcial (" + redondear(err.nota) + " pts): " : "✗ Tu respuesta: ") + tipo.textoTuya(p.datos, err.r)));
       card.appendChild(el("p", "error-linea ok", "✔ Correcta: " + tipo.textoCorrecta(p.datos)));
