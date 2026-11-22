@@ -491,7 +491,6 @@
     $("btn-anterior").disabled = estado.pos === 0;
     $("btn-marcar").classList.toggle("oculto", !simulacro);
     $("btn-terminar").classList.toggle("oculto", !simulacro);
-    $("btn-calc").classList.toggle("oculto", !simulacro);
     $("btn-siguiente").disabled = !simulacro;
     $("btn-siguiente").textContent = ultima ? (simulacro ? "Terminar examen" : "Ver resultados") : "Siguiente →";
     $("btn-siguiente").classList.toggle("oculto", !simulacro && !instantanea);
@@ -976,43 +975,6 @@
     mostrar("pantalla-progreso");
   }
 
-  // ---------- Calculadora (como la del examen) ----------
-  function abrirCalculadora() {
-    var d = $("dlg-calc");
-    if (d.showModal) d.showModal(); else d.setAttribute("open", "");
-    $("calc-pantalla").focus();
-  }
-  function armarCalculadora() {
-    var teclas = ["7", "8", "9", "÷", "(", ")", "4", "5", "6", "×", "√", "x²", "1", "2", "3", "−", "^", "π", "0", ".", "⌫", "+", "C", "="];
-    var cont = $("calc-teclas"), pant = $("calc-pantalla");
-    teclas.forEach(function (t) {
-      var b = el("button", "calc-tecla" + (t === "=" ? " calc-igual" : /[÷×−+^]/.test(t) ? " calc-op" : ""), t);
-      b.type = "button";
-      b.addEventListener("click", function () {
-        if (t === "C") { pant.value = ""; $("calc-resultado").textContent = ""; }
-        else if (t === "⌫") pant.value = pant.value.slice(0, -1);
-        else if (t === "=") calcular();
-        else pant.value += { "√": "√(", "x²": "^2", "π": "π" }[t] || t;
-        pant.focus();
-      });
-      cont.appendChild(b);
-    });
-    pant.addEventListener("keydown", function (ev) { if (ev.key === "Enter") { ev.preventDefault(); calcular(); } });
-  }
-  function calcular() {
-    var pant = $("calc-pantalla"), txt = pant.value.trim();
-    if (!txt) return;
-    try {
-      var v = Tipos._evaluar(txt.replace(/π/g, "(3.14159265)"));
-      if (!isFinite(v)) throw new Error("no válido");
-      var res = Math.round(v * 1e8) / 1e8;
-      $("calc-resultado").textContent = txt + " =";
-      pant.value = String(res);
-    } catch (e) {
-      $("calc-resultado").textContent = "Revisa la operación";
-    }
-  }
-
   // ---------- Formulario (como el del examen) ----------
   function abrirFormulario() {
     var d = $("dlg-formulario");
@@ -1045,15 +1007,17 @@
   $("btn-anterior").addEventListener("click", function () { irA(estado.pos - 1); });
   $("btn-marcar").addEventListener("click", function () { estado.marcadas[estado.pos] = !estado.marcadas[estado.pos]; actualizarRejilla(); });
   $("btn-terminar").addEventListener("click", function () { terminarSimulacro(false); });
-  $("btn-calc").addEventListener("click", abrirCalculadora);
+  // Calculadora (calculadora.js): disponible en práctica, simulacro e inicio
+  Calculadora.armar();
+  $("btn-calc").addEventListener("click", Calculadora.abrir);
+  $("btn-calc-inicio").addEventListener("click", Calculadora.abrir);
   $("btn-repaso-int").addEventListener("click", iniciarRepasoInteligente);
   $("btn-progreso").addEventListener("click", pintarProgresoTemas);
   $("btn-atras-progreso").addEventListener("click", irInicio);
   $("fecha-examen").addEventListener("change", function () { Progreso.ponerFecha($("fecha-examen").value); pintarPlan(); });
   $("sel-carrera").addEventListener("change", pintarPlan);
-  $("btn-cerrar-calc").addEventListener("click", function () { var d = $("dlg-calc"); if (d.close) d.close(); else d.removeAttribute("open"); });
-  $("dlg-calc").addEventListener("click", function (ev) { if (ev.target === ev.currentTarget) $("btn-cerrar-calc").click(); });
-  armarCalculadora();
+  $("btn-cerrar-calc").addEventListener("click", Calculadora.cerrar);
+  $("dlg-calc").addEventListener("click", function (ev) { if (ev.target === ev.currentTarget) Calculadora.cerrar(); });
   try { var carreraGuardada = localStorage.getItem("excoba-carrera"); if (carreraGuardada) $("sel-carrera").value = carreraGuardada; } catch (e) {}
   $("sel-carrera").addEventListener("change", function () { try { localStorage.setItem("excoba-carrera", $("sel-carrera").value); } catch (e) {} });
   $("btn-repasar").addEventListener("click", repasarErrores);

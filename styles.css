@@ -526,18 +526,27 @@ select {
 .modo-simulacro .puntos { display: inline; color: var(--muted); font-weight: 600; font-size: .85rem; }
 #btn-marcar.activa { border-color: var(--bad); color: var(--bad); }
 .zona-sim { display: block; }
-.dlg-calc { width: min(340px, calc(100vw - 24px)); }
-.calc { padding: 12px 14px 16px; }
-.calc-resultado { min-height: 1.2em; font-size: .85rem; text-align: right; }
+/* Calculadora con el mismo acomodo que la del demo del EXCOBA */
+.dlg-calc { width: min(380px, calc(100vw - 24px)); }
+.calc { padding: 12px 14px 14px; }
+.calc-resultado { min-height: 1.2em; font-size: .85rem; text-align: right; color: var(--muted); }
 .calc-pantalla {
-  width: 100%; font-size: 1.4rem; text-align: right; padding: 8px 10px; margin: 4px 0 10px;
-  border: 2px solid var(--border); border-radius: 10px; background: var(--bg); font-variant-numeric: tabular-nums;
+  font-size: 1.9rem; text-align: right; padding: 8px 12px; margin: 4px 0 10px; min-height: 2.2em;
+  border-radius: 8px; background: #3a3a3a; color: #fff; font-variant-numeric: tabular-nums;
+  overflow-x: auto; white-space: nowrap;
 }
-.calc-teclas { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
-.calc-tecla { padding: 10px 0; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); font-weight: 700; cursor: pointer; }
-.calc-tecla:hover { border-color: var(--primary); }
-.calc-op { color: var(--primary); }
-.calc-igual { background: var(--primary); color: #fff; border-color: var(--primary); }
+.calc-teclas { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; }
+.calc-tecla {
+  padding: 10px 0; border-radius: 6px; border: 1px solid #b7791f; cursor: pointer;
+  background: #f2b632; color: #2b1a00; font-size: 1.25rem; font-family: Georgia, "Times New Roman", serif; font-variant-numeric: lining-nums;
+}
+.calc-tecla:hover { filter: brightness(1.06); }
+.calc-tecla:active { transform: translateY(1px); filter: brightness(.95); }
+.calc-tecla.calc-fn { font-size: 1rem; }
+.calc-tecla.calc-borrar { grid-column: span 3; font-size: 1.5rem; }
+.calc-tecla.ancha { grid-column: span 2; }
+.calc-tecla.calc-igual { grid-row: span 2; font-size: 1.8rem; }
+.calc-nota { margin: 8px 0 0; font-size: .75rem; color: var(--muted); text-align: center; }
 
 /* ===== Plan de estudio y progreso por tema ===== */
 .plan-card { margin-bottom: 14px; display: flex; flex-direction: column; gap: 10px; }
