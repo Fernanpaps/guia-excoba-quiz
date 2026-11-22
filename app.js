@@ -701,6 +701,13 @@
   }
 
   // ---------- Cuenta: guardar y mostrar el avance ----------
+  function recordsParaNube() {
+    var r = combinarRecords(leerRecordsLocales(), nube.records);
+    if (window.Progreso) r.__stats = Progreso.exportar();
+    if (nube.records.__tutorial) r.__tutorial = true;
+    return r;
+  }
+
   function guardarEnNube(materiaRecord, pct, total) {
     if (!nube.activa) return;
     if (materiaRecord && (nube.records[materiaRecord] === undefined || pct > nube.records[materiaRecord])) {
@@ -715,8 +722,7 @@
     });
     nube.falladas = Object.keys(pendientes).filter(function (k) { return indice[k]; });
 
-    var records = combinarRecords(leerRecordsLocales(), nube.records);
-    if (window.Progreso) records.__stats = Progreso.exportar();
+    var records = recordsParaNube();
     Cuenta.guardarIntento(estado.titulo, Math.round(estado.puntos), total)
       .then(function () { return Cuenta.guardarProgreso(records, nube.falladas); })
       .catch(function (e) {
@@ -775,17 +781,48 @@
       if (window.Progreso && nube.records.__stats && Progreso.importar(nube.records.__stats) && enInicio()) pintarPlan();
       nube.falladas = ((d && d.falladas) || []).filter(function (k) { return indice[k]; });
       nube.activa = true;
-      var combinados = combinarRecords(leerRecordsLocales(), nube.records);
+      var combinados = recordsParaNube();
       if (!d || JSON.stringify(combinados) !== JSON.stringify(nube.records)) {
         nube.records = combinados;
         Cuenta.guardarProgreso(nube.records, nube.falladas).catch(function () {});
       }
       if (enInicio()) pintarInicio();
       pintarProgreso();
+      // Primera vez que esta persona inicia sesión: le enseñamos cómo se usa la guía
+      if (!tutorialVisto(u) && $("pantalla-quiz").classList.contains("oculto") && window.Tutorial) {
+        Tutorial.iniciar(function () { marcarTutorialVisto(u); });
+      }
     }).catch(function (e) {
       console.warn("No se pudo cargar el avance:", e);
       $("progreso-estado").textContent = "No se pudo cargar tu avance. Revisa tu conexión y recarga la página.";
     });
+  }
+
+  // ---------- Tutorial ----------
+  function tutorialVisto(u) {
+    try { if (localStorage.getItem("excoba-tutorial-" + u.id) === "1") return true; } catch (e) {}
+    return !!nube.records.__tutorial;
+  }
+  function marcarTutorialVisto(u) {
+    try { localStorage.setItem("excoba-tutorial-" + u.id, "1"); } catch (e) {}
+    if (!nube.activa) return;
+    nube.records.__tutorial = true;
+    Cuenta.guardarProgreso(recordsParaNube(), nube.falladas).catch(function () {});
+  }
+  // Pregunta de ejemplo para el tutorial (un triángulo con números al azar)
+  function demoPregunta() {
+    var m = buscarMateria("matematicas");
+    var lugar = m && m.preguntas.filter(function (p) { return p.gen === "pitagoras"; })[0];
+    if (!lugar) return;
+    arrancar("practica", "Ejemplo del tutorial", [prepararPregunta(lugar, m)], { tipo: "demo" });
+  }
+  function demoContestar() {
+    var p = actual();
+    if (!p || estado.respondida) return;
+    if (p.tipo === "num") $("zona-respuesta").querySelectorAll("input").forEach(function (inp, k) { inp.value = String(p.datos.r[k]); });
+    comprobar();
+    $("explicacion").classList.remove("oculto");
+    marcarExplicacion(true);
   }
 
   function repasarGuardadas() {
@@ -1024,6 +1061,14 @@
   $("btn-otra-vez").addEventListener("click", otraRonda);
   $("btn-volver-inicio").addEventListener("click", irInicio);
   $("btn-formulario").addEventListener("click", abrirFormulario);
+  if (window.Tutorial) {
+    Tutorial.conectar({ irInicio: irInicio, demoPregunta: demoPregunta, demoContestar: demoContestar });
+    $("btn-ayuda").addEventListener("click", function () {
+      if (!$("pantalla-quiz").classList.contains("oculto") && estado.titulo !== "Ejemplo del tutorial" &&
+          !confirm("¿Ver el tutorial? Se cerrará la ronda que estás haciendo.")) return;
+      Tutorial.iniciar(function () { var u = Cuenta && Cuenta.usuario && Cuenta.usuario(); if (u) marcarTutorialVisto(u); });
+    });
+  }
   $("btn-formulario-inicio").addEventListener("click", abrirFormulario);
   $("btn-cerrar-formulario").addEventListener("click", cerrarFormulario);
   $("dlg-formulario").addEventListener("click", function (ev) { if (ev.target === ev.currentTarget) cerrarFormulario(); });
@@ -1042,6 +1087,7 @@
 
   // Atajos de teclado: 1-4 o A-D para opción múltiple, Enter para comprobar/seguir
   document.addEventListener("keydown", function (ev) {
+    if (window.Tutorial && Tutorial.activo()) return;
     if ($("pantalla-quiz").classList.contains("oculto")) return;
     if ($("dlg-formulario").open || $("dlg-calc").open) return;
     var enCampo = ev.target && (ev.target.tagName === "SELECT" || ev.target.tagName === "INPUT");
