@@ -441,3 +441,39 @@ select {
   white-space: normal;
 }
 .error-comun strong { display: block; color: var(--bad); margin-bottom: 4px; }
+
+/* ===== Figuras SVG ===== */
+.figura { margin: -4px 0 14px; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.fig-caja { width: 100%; max-width: 520px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 6px; }
+.figura-chica .fig-caja { max-width: 380px; }
+.fig-svg { width: 100%; height: auto; display: block; }
+.fig-svg text { font-family: inherit; fill: var(--text); font-size: 13px; }
+.fig-svg .fig-num { fill: var(--muted); font-size: 11px; }
+.fig-svg .fig-fuerte { fill: var(--text); font-weight: 700; }
+.fig-svg .fig-etq { font-weight: 600; }
+.fig-svg .fig-chico { font-size: 11.5px; }
+.fig-svg .fig-medida { fill: var(--primary); font-weight: 700; font-size: 14px; }
+.fig-svg .fig-vertice { font-weight: 800; font-size: 15px; }
+.fig-svg .fig-angulo { fill: #b45309; font-weight: 700; font-size: 12.5px; }
+.fig-svg .fig-rojo { fill: var(--bad); }
+.fig-rejilla { stroke: var(--border); stroke-width: 1; }
+.fig-eje { stroke: var(--muted); stroke-width: 1.6; }
+.fig-guia { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.fig-linea { fill: none; stroke: var(--primary); stroke-width: 3; stroke-linejoin: round; }
+.fig-linea2 { stroke: #f59e0b; }
+.fig-punto { fill: var(--primary); }
+.fig-vector { stroke: var(--primary); stroke-width: 3; }
+.fig-resultante { stroke: var(--bad); stroke-dasharray: 6 4; }
+.fig-punta { fill: var(--primary); }
+.fig-punta-r { fill: var(--bad); }
+.fig-figura { fill: var(--primary-soft); stroke: var(--primary); stroke-width: 2.5; stroke-linejoin: round; }
+.fig-corte { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.fig-recto { fill: none; stroke: var(--text); stroke-width: 1.5; }
+.fig-cable { stroke: var(--text); stroke-width: 2.2; }
+.fig-res { fill: none; stroke: #f59e0b; stroke-width: 2.6; stroke-linejoin: round; }
+.fig-pila { stroke: var(--text); stroke-width: 3; }
+.fig-pila-c { stroke: var(--text); stroke-width: 5; }
+.fig-barra { fill: var(--primary); opacity: .85; }
+.fig-tabla { border-collapse: collapse; font-size: .95rem; margin: 0 auto; }
+.fig-tabla th, .fig-tabla td { border: 1px solid var(--border); padding: 6px 12px; text-align: center; }
+.fig-tabla th { background: var(--primary-soft); color: var(--primary); }

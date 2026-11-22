@@ -324,6 +324,7 @@
     $("etiqueta-nivel").textContent = NIVELES[p.nivel];
     $("etiqueta-nivel").className = "etiqueta etiqueta-nivel nivel-" + p.nivel;
     $("texto-pregunta").textContent = p.pregunta;
+    $("figura").classList.toggle("oculto", !window.Figuras || !Figuras.dibujar(p.orig.fig, $("figura")));
     $("instruccion").textContent = p.tipo === "opcion" ? "" : tipo.instruccion;
     $("instruccion").classList.toggle("oculto", p.tipo === "opcion");
 
@@ -488,6 +489,7 @@
       card.appendChild(el("span", "etiqueta", p.materia + " · " + p.tema));
       if (p.tipo !== "opcion") card.appendChild(el("span", "etiqueta etiqueta-tipo", Tipos.nombre(p.tipo)));
       card.appendChild(el("p", "pregunta", p.pregunta));
+      if (p.orig.fig && window.Figuras) { var fg = el("div", "figura figura-chica"); Figuras.dibujar(p.orig.fig, fg); card.appendChild(fg); }
       card.appendChild(el("p", "error-linea tu", (err.nota > 0 ? "◐ Parcial (" + redondear(err.nota) + " pts): " : "✗ Tu respuesta: ") + tipo.textoTuya(p.datos, err.r)));
       card.appendChild(el("p", "error-linea ok", "✔ Correcta: " + tipo.textoCorrecta(p.datos)));
       var det = el("details");

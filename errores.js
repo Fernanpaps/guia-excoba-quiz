@@ -116,6 +116,7 @@ window.ERRORES_COMUNES = {
   "México contemporáneo": "Confundir el orden de las crisis y presidentes; ubícalos por sexenio.",
   "México neoliberal": "Ubicar el TLCAN antes de tiempo: entró en vigor en 1994.",
   "Culturas prehispánicas": "Mezclar aportaciones: cabezas colosales (olmecas), el cero (mayas), pirámides del Sol y la Luna (Teotihuacan).",
+  "Línea del tiempo de México": "Confundir las dos constituciones: 1857 (liberal, Reforma) y 1917 (Revolución, la actual).",
   "Personajes de la historia": "Confundir la etapa de cada personaje: Independencia (1810-1821), Reforma (1857-1867), Revolución (1910-1920).",
 
   // ---------- Biología ----------
