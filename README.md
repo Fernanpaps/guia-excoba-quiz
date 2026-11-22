@@ -5,7 +5,7 @@ Contestas, ves al instante si acertaste y, si tienes duda, presionas **“💡 V
 
 Cualquier persona con el enlace puede usarla sin cuenta. Si quiere, puede **crear una cuenta gratis** (correo y contraseña) para guardar su avance: mejores puntajes, historial de rondas y las preguntas que falló, para repasarlas después desde cualquier dispositivo.
 
-## Materias incluidas (1,100+ preguntas)
+## Materias incluidas (1,400+ preguntas y 80 generadores)
 
 | Materia | Archivo |
 |---|---|
@@ -29,12 +29,17 @@ El EXCOBA no es solo de opción múltiple. Según el instructivo y el demo ofici
 | Escritura numérica | Escribes el número (acepta 3.5, 3,5 o 3/4) | `num` |
 | Escritura algebraica | Escribes la expresión (x^2, x^(-2), sqrt(x)); se califica aunque la escribas en otro orden | `alg` |
 | Arrastre de elementos | Clasificar en columnas u ordenar tocando los elementos | `clasificar`, `ordenar` |
-| Selección de elementos | Elegir palabras en un texto o varias opciones correctas | `huecos`, `varias` |
+| Selección de elementos | Elegir palabras en un texto, varias opciones correctas o las 3 frases de un resumen | `huecos`, `varias`, `marcar` |
+| Lectura | Leer una noticia o texto y llenar una tabla | `tabla` (cualquier pregunta puede traer `lectura`) |
 
 Las preguntas con varias partes se califican parcial, igual que en el examen (si son 4 elementos, cada uno vale 0.25).
 
-- **🎯 Simulacro EXCOBA**: 30, 60, 120 o 180 preguntas con 1 minuto por pregunta. No ves si acertaste hasta el final, puedes saltar preguntas para regresar después y al terminar ves tu calificación por materia (la meta es 70).
-- **📐 Formulario**: las fórmulas que dan en el examen, disponibles en cualquier momento.
+- **🎯 Simulacro EXCOBA**: igual que el examen real, 180 preguntas en 3 horas: 40 de primaria (20 Español, 20 Matemáticas), 80 de secundaria (20 de Español, Matemáticas, Ciencias naturales y Ciencias sociales) y 60 de especialidad (20 por materia, según la carrera; por defecto Ingeniería de Software: Matemáticas para cálculo, Física y Química). Tiene cuadrícula de preguntas, marcar para revisar, calculadora, formulario y calificación por sección. También hay versiones de 90 y 45 preguntas.
+- **📐 Formulario** y **🧮 Calculadora**: como los del examen.
+- **Niveles**: cada pregunta es 🟢 básica, 🟡 nivel EXCOBA o 🔴 difícil (campo `n: 1|2|3`), y se elige el nivel en el inicio.
+- **🎲 Práctica infinita**: 80 generadores (`generadores*.js`) inventan ejercicios de Matemáticas, Física y Química con números nuevos cada vez, con gráficas, triángulos y circuitos dibujados en SVG (`figuras.js`).
+- **💡 Procedimiento**: paso a paso con fórmula y sustitución, y un **⚠️ error común** (de la pregunta, campo `err`, o de su tema en `errores.js`).
+- **🧠 Repaso inteligente**: las preguntas falladas vuelven a salir hasta acertarlas 3 veces seguidas (al día siguiente, a los 3 días…). **📈 Mi progreso por tema** muestra qué está dominado y qué falta, y **📅 Mi plan de estudio** arma las tareas de cada día según los fallos y los días que faltan para el examen (`progreso.js`).
 
 ## Cómo se usa
 
@@ -64,8 +69,11 @@ Las preguntas con formato de examen agregan un campo `tipo`. Los ejemplos de cad
 ```js
 { tipo: "num", t: "Porcentajes y regla de 3", q: "¿Cuánto es el 35% de 240?", r: 84, e: "..." },
 { tipo: "clasificar", t: "Nutrición", q: "Clasifica...", cats: ["Autótrofo", "Heterótrofo"],
-  items: [["Pino", 0], ["León", 1]], e: "..." },
+  items: [["Pino", 0], ["León", 1]], e: "...", err: "error común", n: 2 },
+{ tipo: "num", t: "Circuitos", q: "...", fig: { tipo: "circuito", modo: "serie", R: ["4 Ω", "6 Ω"], V: "20 V" }, r: 2, e: "..." },
 ```
+
+Después de cambiar archivos `.js` o `.css`, sube el número `?v=` de las etiquetas en `index.html` para que los navegadores no usen la versión vieja.
 
 ## Verla en tu computadora
 

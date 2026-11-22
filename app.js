@@ -51,7 +51,7 @@
     return c;
   }
   function mostrar(idPantalla) {
-    ["pantalla-inicio", "pantalla-login", "pantalla-materia", "pantalla-quiz", "pantalla-resultados"].forEach(function (id) {
+    ["pantalla-inicio", "pantalla-login", "pantalla-materia", "pantalla-quiz", "pantalla-resultados", "pantalla-progreso"].forEach(function (id) {
       $(id).classList.toggle("oculto", id !== idPantalla);
     });
     window.scrollTo(0, 0);
@@ -148,7 +148,7 @@
   function combinarRecords(a, b) {
     var r = {};
     [a || {}, b || {}].forEach(function (o) {
-      Object.keys(o).forEach(function (k) { if (r[k] === undefined || o[k] > r[k]) r[k] = o[k]; });
+      Object.keys(o).forEach(function (k) { if (k.indexOf("__") === 0) return; if (r[k] === undefined || o[k] > r[k]) r[k] = o[k]; });
     });
     return r;
   }
@@ -257,7 +257,13 @@
     if (!lista.length) { avisoSinNivel(); return; }
     if (revolverActivo() && !yaRevuelto) lista = revolver(lista);
     var n = cantidadElegida();
-    if (recortar && n > 0) lista = lista.slice(0, n);
+    if (recortar && n > 0) {
+      // Repaso inteligente: hasta 40% de la ronda son preguntas que fallaste antes y ya toca repasar
+      var pend = lista.filter(function (p) { return window.Progreso && Progreso.esPendiente(p.clave); });
+      var cupo = Math.min(pend.length, Math.ceil(n * 0.4));
+      var primero = pend.slice(0, cupo);
+      lista = revolver(primero.concat(lista.filter(function (p) { return primero.indexOf(p) === -1; }).slice(0, n - cupo)));
+    }
     arrancar("practica", titulo, lista, origen);
   }
 
@@ -599,6 +605,13 @@
     $("resultado-score").textContent = puntos + " / " + total + "  (" + pct + "%)";
     $("resultado-mensaje").textContent = mensaje;
 
+    if (window.Progreso) {
+      estado.preguntas.forEach(function (p, i) {
+        if (estado.notas[i] === null || (simulacro && estado.respuestas[i] === null)) return;
+        Progreso.registrar(p.clave, p.m.id, p.tema, estado.notas[i]);
+      });
+      Progreso.guardar();
+    }
     var o = estado.origen || {};
     var claveRecord = (o.tipo === "materia" && !o.tema) ? o.materiaId : (simulacro ? "simulacro" : null);
     if (claveRecord) guardarRecord(claveRecord, pct);
@@ -680,6 +693,7 @@
     if (o.tipo === "formato") { iniciarFormato(); return; }
     if (o.tipo === "simulacro") { iniciarSimulacro(); return; }
     if (o.tipo === "infinita") { iniciarInfinita(); return; }
+    if (o.tipo === "repasoint") { iniciarRepasoInteligente(); return; }
     if (o.tipo === "repaso" && o.lista) {
       empezar("Repaso de errores", o.lista.map(function (x) { return prepararPregunta(x.p, x.m); }), false, o); return;
     }
@@ -703,6 +717,7 @@
     nube.falladas = Object.keys(pendientes).filter(function (k) { return indice[k]; });
 
     var records = combinarRecords(leerRecordsLocales(), nube.records);
+    if (window.Progreso) records.__stats = Progreso.exportar();
     Cuenta.guardarIntento(estado.titulo, Math.round(estado.puntos), total)
       .then(function () { return Cuenta.guardarProgreso(records, nube.falladas); })
       .catch(function (e) {
@@ -758,6 +773,7 @@
     if (!u) { if (enInicio()) pintarInicio(); return; }
     Cuenta.cargarProgreso().then(function (d) {
       nube.records = (d && d.records) || {};
+      if (window.Progreso && nube.records.__stats && Progreso.importar(nube.records.__stats) && enInicio()) pintarPlan();
       nube.falladas = ((d && d.falladas) || []).filter(function (k) { return indice[k]; });
       nube.activa = true;
       var combinados = combinarRecords(leerRecordsLocales(), nube.records);
@@ -836,8 +852,128 @@
   function irInicio() {
     detenerReloj();
     pintarInicio();
+    pintarPlan();
     pintarProgreso();
     mostrar("pantalla-inicio");
+  }
+
+  // ---------- Repaso inteligente, progreso por tema y plan de estudio ----------
+  function iniciarRepasoInteligente() {
+    var claves = Progreso.pendientes(), n = cantidadElegida() || 20;
+    var lista = claves.map(function (k) { return indice[k]; }).filter(Boolean).slice(0, n)
+      .map(function (x) { return prepararPregunta(x.p, x.m); });
+    if (!lista.length) { alert("No tienes preguntas pendientes de repaso por ahora. ¡Bien! Sigue practicando temas nuevos."); return; }
+    arrancar("practica", "🧠 Repaso inteligente", revolver(lista), { tipo: "repasoint" });
+  }
+
+  // Lista de todos los temas con su estado, ordenados por prioridad para estudiar
+  function temasConEstado() {
+    var esp = (ESPECIALIDAD[$("sel-carrera").value] || ESPECIALIDAD.software).materias.map(function (x) { return x[1]; });
+    var r = [];
+    materias.forEach(function (m) {
+      var vistos = {};
+      m.preguntas.forEach(function (p) {
+        if (vistos[p.t]) { vistos[p.t].n++; return; }
+        var st = Progreso.tema(m.id, p.t), es = Progreso.estadoTema(st);
+        vistos[p.t] = { m: m, t: p.t, n: 1, st: st, est: es, esp: esp.indexOf(m.id) !== -1 };
+        r.push(vistos[p.t]);
+      });
+    });
+    var peso = { flojo: 0, nuevo: 1, proceso: 2, dominado: 3 };
+    r.sort(function (a, b) {
+      if (peso[a.est.clase] !== peso[b.est.clase]) return peso[a.est.clase] - peso[b.est.clase];
+      if (a.esp !== b.esp) return a.esp ? -1 : 1;                 // primero las materias de tu especialidad
+      if (a.est.pct !== null && b.est.pct !== null) return a.est.pct - b.est.pct;
+      return b.n - a.n;                                           // temas con más preguntas primero
+    });
+    return r;
+  }
+  function diasParaExamen() {
+    var f = Progreso.fechaExamen();
+    if (!f) return null;
+    var hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    var ex = new Date(f + "T00:00:00");
+    return Math.round((ex - hoy) / 86400000);
+  }
+  function botonTema(x) {
+    var b = el("button", "plan-tema estado-" + x.est.clase); b.type = "button";
+    b.appendChild(el("span", "", x.m.icono + " " + x.t));
+    b.appendChild(el("small", "", x.est.txt + (x.est.pct !== null ? " · " + x.est.pct + "%" : "")));
+    b.addEventListener("click", function () { iniciarMateria(x.m, x.t); });
+    return b;
+  }
+  function pintarPlan() {
+    if (!window.Progreso) return;
+    $("fecha-examen").value = Progreso.fechaExamen();
+    var cont = $("plan-hoy");
+    cont.innerHTML = "";
+    var d = diasParaExamen(), lista = temasConEstado();
+    var porEstudiar = lista.filter(function (x) { return x.est.clase !== "dominado"; });
+    var dominados = lista.length - porEstudiar.length;
+    var pend = Progreso.pendientes().filter(function (k) { return indice[k]; }).length;
+
+    var cab = el("p", "plan-dias");
+    if (d === null) cab.textContent = "Pon la fecha de tu examen y te armo un plan para cada día.";
+    else if (d < 0) cab.textContent = "La fecha del examen ya pasó. Si cambió, actualízala.";
+    else if (d === 0) cab.textContent = "¡Hoy es el examen! Repasa el formulario, descansa y confía en lo que estudiaste. 💪";
+    else cab.textContent = "Faltan " + d + " día" + (d === 1 ? "" : "s") + " · " + dominados + " de " + lista.length + " temas dominados.";
+    cont.appendChild(cab);
+    if (d !== null && d <= 0) return;
+
+    var dias = d === null ? 30 : d;
+    var porDia = Math.max(2, Math.min(6, Math.ceil(porEstudiar.length / dias)));
+    cont.appendChild(el("strong", "plan-titulo", "Hoy te toca:"));
+    var hoy = el("div", "plan-lista");
+    $("btn-repaso-int").textContent = "🧠 Repaso inteligente" + (pend ? " (" + pend + " pendientes)" : "");
+    $("btn-repaso-int").disabled = !pend;
+    if (pend) hoy.appendChild(el("p", "plan-paso", "1. Haz tu repaso inteligente: " + pend + " pregunta" + (pend === 1 ? "" : "s") + " que fallaste y ya toca repasar (botón de abajo)."));
+    porEstudiar.slice(0, porDia).forEach(function (x) { hoy.appendChild(botonTema(x)); });
+    cont.appendChild(hoy);
+    if (d !== null && (d <= 7 || d % 7 === 0)) {
+      cont.appendChild(el("p", "plan-paso plan-simulacro", d <= 7
+        ? "🎯 Falta poco: haz hoy un simulacro (de 90 o de 180) para practicar el tiempo, y revisa tus errores."
+        : "🎯 Hoy toca simulacro semanal: haz uno de 90 preguntas y mira tu calificación por sección."));
+    }
+    if (porEstudiar.length > porDia) {
+      var prox = el("details", "plan-proximos");
+      prox.appendChild(el("summary", "", "Próximos días"));
+      for (var k = 1; k <= 3 && k * porDia < porEstudiar.length; k++) {
+        var nombres = porEstudiar.slice(k * porDia, (k + 1) * porDia).map(function (x) { return x.t; }).join(", ");
+        prox.appendChild(el("p", "plan-paso", (k === 1 ? "Mañana" : "En " + k + " días") + ": " + nombres));
+      }
+      cont.appendChild(prox);
+    }
+  }
+  function pintarProgresoTemas() {
+    var cont = $("lista-progreso");
+    cont.innerHTML = "";
+    var lista = temasConEstado(), cuenta = { dominado: 0, proceso: 0, flojo: 0, nuevo: 0 };
+    lista.forEach(function (x) { cuenta[x.est.clase]++; });
+    $("progreso-resumen").textContent = cuenta.dominado + " dominados · " + cuenta.proceso + " en proceso · " + cuenta.flojo + " flojos · " + cuenta.nuevo + " sin practicar";
+    materias.forEach(function (m) {
+      var deM = lista.filter(function (x) { return x.m === m; });
+      var det = el("details", "card progreso-materia");
+      var dom = deM.filter(function (x) { return x.est.clase === "dominado"; }).length;
+      var sum = el("summary", "");
+      sum.appendChild(el("span", "", m.icono + " " + m.nombre));
+      sum.appendChild(el("small", "muted", dom + "/" + deM.length + " dominados"));
+      det.appendChild(sum);
+      deM.sort(function (a, b) { return a.t.localeCompare(b.t); }).forEach(function (x) {
+        var fila = el("button", "progreso-fila"); fila.type = "button";
+        fila.appendChild(el("span", "progreso-tema", x.t));
+        var barra = el("span", "desglose-barra"), rell = el("span", "desglose-relleno");
+        rell.style.width = (x.est.pct || 0) + "%";
+        rell.classList.add(x.est.clase === "dominado" ? "bien" : x.est.clase === "flojo" ? "mal" : "medio");
+        barra.appendChild(rell);
+        fila.appendChild(barra);
+        fila.appendChild(el("span", "progreso-estado estado-" + x.est.clase, x.est.txt + (x.est.pct !== null ? " " + x.est.pct + "% (" + x.st.v + ")" : "")));
+        fila.title = "Practicar " + x.t;
+        fila.addEventListener("click", function () { iniciarMateria(x.m, x.t); });
+        det.appendChild(fila);
+      });
+      cont.appendChild(det);
+    });
+    mostrar("pantalla-progreso");
   }
 
   // ---------- Calculadora (como la del examen) ----------
@@ -910,6 +1046,11 @@
   $("btn-marcar").addEventListener("click", function () { estado.marcadas[estado.pos] = !estado.marcadas[estado.pos]; actualizarRejilla(); });
   $("btn-terminar").addEventListener("click", function () { terminarSimulacro(false); });
   $("btn-calc").addEventListener("click", abrirCalculadora);
+  $("btn-repaso-int").addEventListener("click", iniciarRepasoInteligente);
+  $("btn-progreso").addEventListener("click", pintarProgresoTemas);
+  $("btn-atras-progreso").addEventListener("click", irInicio);
+  $("fecha-examen").addEventListener("change", function () { Progreso.ponerFecha($("fecha-examen").value); pintarPlan(); });
+  $("sel-carrera").addEventListener("change", pintarPlan);
   $("btn-cerrar-calc").addEventListener("click", function () { var d = $("dlg-calc"); if (d.close) d.close(); else d.removeAttribute("open"); });
   $("dlg-calc").addEventListener("click", function (ev) { if (ev.target === ev.currentTarget) $("btn-cerrar-calc").click(); });
   armarCalculadora();

@@ -6,7 +6,7 @@
   <title>Guía EXCOBA Quiz</title>
   <meta name="description" content="Cuestionario interactivo para estudiar el examen EXCOBA, con explicación paso a paso de cada pregunta.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
-  <link rel="stylesheet" href="styles.css?v=7">
+  <link rel="stylesheet" href="styles.css?v=8">
 </head>
 <body>
   <header class="topbar">
@@ -64,6 +64,16 @@
         </label>
       </div>
 
+      <div class="card plan-card">
+        <div class="plan-cabeza">
+          <strong>📅 Mi plan de estudio</strong>
+          <button class="btn btn-fantasma" id="btn-progreso" type="button">📈 Mi progreso por tema</button>
+        </div>
+        <label class="campo-fecha">Fecha de mi examen <input type="date" id="fecha-examen"></label>
+        <div id="plan-hoy"></div>
+        <button class="btn btn-primario" id="btn-repaso-int" type="button">🧠 Repaso inteligente</button>
+      </div>
+
       <div class="card simulacro-card">
         <div class="simulacro-cabeza">
           <span class="mixto-icono" aria-hidden="true">🎯</span>
@@ -107,6 +117,15 @@
       <div class="materias" id="lista-materias"></div>
 
       <p class="total-preguntas" id="total-preguntas"></p>
+    </section>
+
+    <!-- ===== PANTALLA DE PROGRESO POR TEMA ===== -->
+    <section id="pantalla-progreso" class="pantalla oculto">
+      <button class="link-atras" id="btn-atras-progreso" type="button">← Volver</button>
+      <h2>📈 Mi progreso por tema</h2>
+      <p class="muted" id="progreso-resumen"></p>
+      <p class="muted progreso-ayuda">Dominado = 80% o más con al menos 5 preguntas. Toca un tema para practicarlo.</p>
+      <div id="lista-progreso"></div>
     </section>
 
     <!-- ===== PANTALLA DE CUENTA ===== -->
@@ -314,32 +333,33 @@
 
   <!-- Primero el banco, luego las preguntas de cada materia y al final la lógica de la página -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-  <script src="config.js?v=7"></script>
-  <script src="cuenta.js?v=7"></script>
-  <script src="tipos.js?v=7"></script>
-  <script src="errores.js?v=7"></script>
-  <script src="figuras.js?v=7"></script>
-  <script src="banco.js?v=7"></script>
-  <script src="data/espanol.js?v=7"></script>
-  <script src="data/matematicas.js?v=7"></script>
-  <script src="data/historia_universal.js?v=7"></script>
-  <script src="data/geografia_civismo.js?v=7"></script>
-  <script src="data/historia_mexico.js?v=7"></script>
-  <script src="data/biologia.js?v=7"></script>
-  <script src="data/quimica.js?v=7"></script>
-  <script src="data/fisica.js?v=7"></script>
+  <script src="config.js?v=8"></script>
+  <script src="cuenta.js?v=8"></script>
+  <script src="progreso.js?v=8"></script>
+  <script src="tipos.js?v=8"></script>
+  <script src="errores.js?v=8"></script>
+  <script src="figuras.js?v=8"></script>
+  <script src="banco.js?v=8"></script>
+  <script src="data/espanol.js?v=8"></script>
+  <script src="data/matematicas.js?v=8"></script>
+  <script src="data/historia_universal.js?v=8"></script>
+  <script src="data/geografia_civismo.js?v=8"></script>
+  <script src="data/historia_mexico.js?v=8"></script>
+  <script src="data/biologia.js?v=8"></script>
+  <script src="data/quimica.js?v=8"></script>
+  <script src="data/fisica.js?v=8"></script>
   <!-- Preguntas con el formato del examen real -->
-  <script src="data/examen/matematicas.js?v=7"></script>
-  <script src="data/examen/espanol.js?v=7"></script>
-  <script src="data/examen/ciencias.js?v=7"></script>
-  <script src="data/examen/sociales.js?v=7"></script>
-  <script src="data/examen/figuras.js?v=7"></script>
-  <script src="data/examen/espanol_lectura.js?v=7"></script>
-  <script src="data/examen/memoria.js?v=7"></script>
+  <script src="data/examen/matematicas.js?v=8"></script>
+  <script src="data/examen/espanol.js?v=8"></script>
+  <script src="data/examen/ciencias.js?v=8"></script>
+  <script src="data/examen/sociales.js?v=8"></script>
+  <script src="data/examen/figuras.js?v=8"></script>
+  <script src="data/examen/espanol_lectura.js?v=8"></script>
+  <script src="data/examen/memoria.js?v=8"></script>
   <!-- Ejercicios con números al azar -->
-  <script src="generadores.js?v=7"></script>
-  <script src="generadores_ciencias.js?v=7"></script>
-  <script src="generadores_especialidad.js?v=7"></script>
-  <script src="app.js?v=7"></script>
+  <script src="generadores.js?v=8"></script>
+  <script src="generadores_ciencias.js?v=8"></script>
+  <script src="generadores_especialidad.js?v=8"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>

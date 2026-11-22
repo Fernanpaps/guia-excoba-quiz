@@ -538,3 +538,40 @@ select {
 .calc-tecla:hover { border-color: var(--primary); }
 .calc-op { color: var(--primary); }
 .calc-igual { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+/* ===== Plan de estudio y progreso por tema ===== */
+.plan-card { margin-bottom: 14px; display: flex; flex-direction: column; gap: 10px; }
+.plan-cabeza { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.plan-cabeza .btn { padding: 7px 12px; font-size: .9rem; }
+.campo-fecha { display: flex; align-items: center; gap: 10px; font-size: .92rem; color: var(--muted); font-weight: 600; flex-wrap: wrap; }
+.campo-fecha input { padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); }
+.plan-dias { margin: 0; font-weight: 600; }
+.plan-titulo { font-size: .92rem; }
+.plan-lista { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.plan-paso { margin: 4px 0; font-size: .92rem; }
+.plan-simulacro { color: var(--primary); font-weight: 600; }
+.plan-tema {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px; text-align: left;
+  padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); cursor: pointer;
+}
+.plan-tema:hover { border-color: var(--primary); }
+.plan-tema small { flex-shrink: 0; font-weight: 700; }
+.estado-flojo small, .progreso-estado.estado-flojo { color: var(--bad); }
+.estado-proceso small, .progreso-estado.estado-proceso { color: #b45309; }
+.estado-dominado small, .progreso-estado.estado-dominado { color: var(--ok); }
+.estado-nuevo small, .progreso-estado.estado-nuevo { color: var(--muted); }
+.plan-proximos summary { cursor: pointer; font-size: .9rem; color: var(--primary); font-weight: 600; }
+.progreso-ayuda { font-size: .85rem; margin-top: -6px; }
+.progreso-materia { margin-bottom: 10px; padding: 12px 14px; }
+.progreso-materia summary { cursor: pointer; display: flex; justify-content: space-between; gap: 10px; font-weight: 700; }
+.progreso-fila {
+  display: grid; grid-template-columns: minmax(120px, 1.4fr) 1fr auto; gap: 10px; align-items: center;
+  width: 100%; text-align: left; padding: 8px 4px; border: 0; border-top: 1px solid var(--border); background: none; cursor: pointer; font-size: .9rem;
+}
+.progreso-fila:hover { background: var(--bg); }
+.progreso-tema { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.progreso-estado { font-size: .8rem; font-weight: 700; white-space: nowrap; }
+@media (max-width: 520px) {
+  .progreso-fila { grid-template-columns: 1fr auto; }
+  .progreso-fila .desglose-barra { grid-column: 1 / -1; grid-row: 2; }
+}
