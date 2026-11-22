@@ -65,6 +65,27 @@
   function redondear(n) { return Math.round(n * 100) / 100; }
   function esFormatoExamen(p) { return !!p.tipo && p.tipo !== "opcion"; }
 
+  // ---------- Niveles: 1 básico, 2 EXCOBA, 3 difícil ----------
+  var NIVELES = { 1: "🟢 Básico", 2: "🟡 Nivel EXCOBA", 3: "🔴 Difícil" };
+  function nivelDe(p) {
+    if (p.n) return p.n;
+    if (esFormatoExamen(p) || /Examen de (práctica|repaso)/.test(p.t)) return 2;
+    return 1;
+  }
+  function nivelElegido() { return parseInt($("sel-nivel").value, 10) || 0; }
+  function pasaNivel(p) {
+    var n = nivelElegido(), np = nivelDe(p);
+    if (!n) return true;
+    if (n === 23) return np >= 2;
+    return np === n;
+  }
+  function nombreNivelElegido() { return $("sel-nivel").options[$("sel-nivel").selectedIndex].text; }
+  function avisoSinNivel() {
+    alert("Todavía no hay preguntas de \"" + nombreNivelElegido() + "\" aquí. Elige otro nivel o \"Todos los niveles\".");
+  }
+  // Error común: el de la pregunta o, si no trae, el de su tema
+  function errorComun(p) { return p.err || (window.ERRORES_COMUNES || {})[p.t] || ""; }
+
   // Clave fija de cada pregunta (para guardar cuáles falló cada usuario)
   function hashTexto(t) {
     var h = 5381;
@@ -89,6 +110,7 @@
       orig: p, m: m,
       tipo: p.tipo || "opcion",
       tema: p.t,
+      nivel: nivelDe(p),
       materia: m.nombre,
       pregunta: p.q,
       explicacion: p.e,
@@ -100,7 +122,7 @@
   function todasPreparadas(filtro) {
     var r = [];
     materias.forEach(function (m) {
-      m.preguntas.forEach(function (p) { if (!filtro || filtro(p)) r.push(prepararPregunta(p, m)); });
+      m.preguntas.forEach(function (p) { if (pasaNivel(p) && (!filtro || filtro(p))) r.push(prepararPregunta(p, m)); });
     });
     return r;
   }
@@ -139,6 +161,7 @@
     materias.forEach(function (m) {
       total += m.preguntas.length;
       var nf = m.preguntas.filter(esFormatoExamen).length;
+      var nn = nivelElegido() ? m.preguntas.filter(pasaNivel).length : null;
       formato += nf;
       var btn = el("button", "materia-btn"); btn.type = "button";
       btn.appendChild(el("span", "materia-icono", m.icono));
@@ -146,7 +169,7 @@
       textos.appendChild(el("span", "materia-nombre", m.nombre));
       var rec = records[m.id];
       textos.appendChild(el("span", "materia-info",
-        m.preguntas.length + " preguntas" + (nf ? " · " + nf + " tipo examen" : "") + (rec !== undefined ? " · mejor: " + rec + "%" : "")));
+        (nn !== null ? nn + " de este nivel" : m.preguntas.length + " preguntas") + (nf ? " · " + nf + " tipo examen" : "") + (rec !== undefined ? " · mejor: " + rec + "%" : "")));
       btn.appendChild(textos);
       btn.addEventListener("click", function () { abrirMateria(m); });
       cont.appendChild(btn);
@@ -161,11 +184,13 @@
   // ---------- Pantalla de una materia (elegir tema) ----------
   function abrirMateria(m) {
     $("materia-titulo").textContent = m.icono + " " + m.nombre;
-    var nf = m.preguntas.filter(esFormatoExamen).length;
-    $("materia-resumen").textContent = m.preguntas.length + " preguntas en total" + (nf ? " (" + nf + " con formato de examen)." : ".");
+    var delNivel = m.preguntas.filter(pasaNivel);
+    var nf = delNivel.filter(esFormatoExamen).length;
+    $("materia-resumen").textContent = delNivel.length + " preguntas" + (nivelElegido() ? " de " + nombreNivelElegido() : " en total") +
+      (nf ? " (" + nf + " con formato de examen)." : ".");
 
     var temas = [], conteo = {};
-    m.preguntas.forEach(function (p) {
+    delNivel.forEach(function (p) {
       if (!conteo[p.t]) { conteo[p.t] = 0; temas.push(p.t); }
       conteo[p.t]++;
     });
@@ -180,6 +205,8 @@
       cont.appendChild(btn);
     });
 
+    if (!temas.length) cont.appendChild(el("p", "muted", "Aún no hay preguntas de este nivel en esta materia. Cambia el nivel en la pantalla de inicio."));
+    $("btn-empezar-materia").disabled = !temas.length;
     $("btn-empezar-materia").onclick = function () { iniciarMateria(m, null); };
     $("btn-formato-materia").classList.toggle("oculto", !nf);
     $("btn-formato-materia").onclick = function () { iniciarFormatoMateria(m); };
@@ -188,12 +215,12 @@
 
   // ---------- Iniciar rondas ----------
   function iniciarMateria(m, tema) {
-    var lista = m.preguntas.filter(function (p) { return !tema || p.t === tema; });
+    var lista = m.preguntas.filter(function (p) { return pasaNivel(p) && (!tema || p.t === tema); });
     var titulo = tema ? m.nombre + " · " + tema : m.nombre;
     empezar(titulo, preparar(lista, m), !tema, { tipo: "materia", materiaId: m.id, tema: tema });
   }
   function iniciarFormatoMateria(m) {
-    empezar(m.nombre + " · formato examen", preparar(m.preguntas.filter(esFormatoExamen), m), true,
+    empezar(m.nombre + " · formato examen", preparar(m.preguntas.filter(function (p) { return esFormatoExamen(p) && pasaNivel(p); }), m), true,
       { tipo: "formato", materiaId: m.id }, false);
   }
   function iniciarMixto() {
@@ -205,6 +232,7 @@
 
   function empezar(titulo, preguntas, recortar, origen, yaRevuelto) {
     var lista = preguntas;
+    if (!lista.length) { avisoSinNivel(); return; }
     if (revolverActivo() && !yaRevuelto) lista = revolver(lista);
     var n = cantidadElegida();
     if (recortar && n > 0) lista = lista.slice(0, n);
@@ -246,9 +274,13 @@
       var cuantas = gi === REPARTO.length - 1 ? n - elegidas.length : Math.round(n * grupo.peso);
       var pool = [];
       grupo.ids.forEach(function (id) { var m = buscarMateria(id); if (m) pool = pool.concat(preparar(m.preguntas, m)); });
+      // Primero las del nivel elegido; si no alcanzan, se completa con las demás
+      var delNivel = revolver(pool.filter(function (x) { return pasaNivel(x.orig); }));
+      var otras = revolver(pool.filter(function (x) { return !pasaNivel(x.orig); }));
+      pool = delNivel.concat(otras);
       // La mitad (o lo que haya) con formato de examen real, el resto de opción múltiple
-      var formato = revolver(pool.filter(function (x) { return x.tipo !== "opcion"; }));
-      var opcion = revolver(pool.filter(function (x) { return x.tipo === "opcion"; }));
+      var formato = pool.filter(function (x) { return x.tipo !== "opcion"; });
+      var opcion = pool.filter(function (x) { return x.tipo === "opcion"; });
       var deFormato = Math.min(formato.length, Math.ceil(cuantas / 2));
       elegidas = elegidas.concat(formato.slice(0, deFormato), opcion.slice(0, cuantas - deFormato));
     });
@@ -289,6 +321,8 @@
     $("etiqueta-tema").textContent = (estado.origen && estado.origen.tipo === "materia" ? "" : p.materia + " · ") + p.tema;
     $("etiqueta-tipo").textContent = Tipos.nombre(p.tipo);
     $("etiqueta-tipo").classList.toggle("oculto", p.tipo === "opcion");
+    $("etiqueta-nivel").textContent = NIVELES[p.nivel];
+    $("etiqueta-nivel").className = "etiqueta etiqueta-nivel nivel-" + p.nivel;
     $("texto-pregunta").textContent = p.pregunta;
     $("instruccion").textContent = p.tipo === "opcion" ? "" : tipo.instruccion;
     $("instruccion").classList.toggle("oculto", p.tipo === "opcion");
@@ -362,6 +396,14 @@
     exp.innerHTML = "";
     exp.appendChild(el("strong", "", "¿Cómo se resuelve?"));
     exp.appendChild(el("div", "", p.explicacion));
+    var err = errorComun(p.orig);
+    if (err) exp.appendChild(cajaError(err));
+  }
+  function cajaError(texto) {
+    var caja = el("div", "error-comun");
+    caja.appendChild(el("strong", "", "⚠️ Error común"));
+    caja.appendChild(el("span", "", texto));
+    return caja;
   }
   function marcarExplicacion(abierta) {
     $("btn-explicacion").setAttribute("aria-expanded", abierta ? "true" : "false");
@@ -450,7 +492,10 @@
       card.appendChild(el("p", "error-linea ok", "✔ Correcta: " + tipo.textoCorrecta(p.datos)));
       var det = el("details");
       det.appendChild(el("summary", "", "💡 Ver procedimiento"));
-      det.appendChild(el("div", "explicacion", p.explicacion));
+      var expl = el("div", "explicacion", p.explicacion);
+      var errC = errorComun(p.orig);
+      if (errC) expl.appendChild(cajaError(errC));
+      det.appendChild(expl);
       card.appendChild(det);
       cont.appendChild(card);
     });
@@ -732,6 +777,12 @@
       if (estado.modo === "practica" && !estado.respondida && p.tipo !== "opcion") comprobar();
       else if (estado.respondida || estado.modo === "simulacro") siguiente();
     }
+  });
+
+  try { var nivelGuardado = localStorage.getItem("excoba-nivel"); if (nivelGuardado) $("sel-nivel").value = nivelGuardado; } catch (e) {}
+  $("sel-nivel").addEventListener("change", function () {
+    try { localStorage.setItem("excoba-nivel", $("sel-nivel").value); } catch (e) {}
+    pintarInicio();
   });
 
   irInicio();

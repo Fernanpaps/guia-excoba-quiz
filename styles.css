@@ -430,3 +430,14 @@ select {
   .desglose-barra { grid-column: 1 / -1; grid-row: 2; }
   .quiz-acciones .btn { flex: 1 1 auto; min-width: 0; }
 }
+
+/* ===== Niveles y error común ===== */
+.etiqueta-nivel { background: var(--bg); color: var(--muted); }
+.etiqueta-nivel.nivel-2 { color: #b45309; }
+.etiqueta-nivel.nivel-3 { color: var(--bad); }
+.error-comun {
+  margin-top: 12px; padding: 10px 12px; border-radius: 8px;
+  background: var(--bad-soft); border: 1px solid var(--bad);
+  white-space: normal;
+}
+.error-comun strong { display: block; color: var(--bad); margin-bottom: 4px; }

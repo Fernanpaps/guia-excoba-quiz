@@ -48,6 +48,16 @@
             <option value="0">Todas</option>
           </select>
         </div>
+        <div class="campo">
+          <label for="sel-nivel">Nivel de dificultad</label>
+          <select id="sel-nivel">
+            <option value="0">Todos los niveles</option>
+            <option value="1">🟢 Básico</option>
+            <option value="2">🟡 Nivel EXCOBA</option>
+            <option value="3">🔴 Difícil</option>
+            <option value="23">🟡🔴 EXCOBA y difícil</option>
+          </select>
+        </div>
         <label class="check">
           <input type="checkbox" id="chk-revolver" checked>
           Revolver el orden de las preguntas
@@ -141,6 +151,7 @@
         <div class="etiquetas">
           <span class="etiqueta" id="etiqueta-tema"></span>
           <span class="etiqueta etiqueta-tipo oculto" id="etiqueta-tipo"></span>
+          <span class="etiqueta etiqueta-nivel" id="etiqueta-nivel"></span>
           <button class="btn-formulario" id="btn-formulario" type="button">📐 Formulario</button>
         </div>
         <h2 class="pregunta" id="texto-pregunta"></h2>
@@ -277,6 +288,7 @@
   <script src="config.js"></script>
   <script src="cuenta.js"></script>
   <script src="tipos.js"></script>
+  <script src="errores.js"></script>
   <script src="banco.js"></script>
   <script src="data/espanol.js"></script>
   <script src="data/matematicas.js"></script>
