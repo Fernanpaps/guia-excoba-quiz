@@ -93,6 +93,7 @@
     return (h >>> 0).toString(36);
   }
   function claveDe(p, materiaId) {
+    if (p.gen) return materiaId + ":gen:" + p.gen;
     if (!p.tipo || p.tipo === "opcion") return materiaId + ":" + hashTexto(p.q + "|" + p.o[p.a]);
     return materiaId + ":" + p.tipo + ":" + hashTexto(p.q + "|" + JSON.stringify(p.r || p.items || p.huecos || p.a || ""));
   }
@@ -105,6 +106,14 @@
 
   // Prepara una pregunta para mostrarla (revuelve opciones, etc.)
   function prepararPregunta(p, m) {
+    // Ejercicio generado: se inventa uno nuevo con otros números cada vez
+    if (p.gen && !p.q.indexOf("🎲") && window.GENERADORES && GENERADORES[p.gen]) {
+      var real = GENERADORES[p.gen].f();
+      real.t = p.t; real.n = p.n; real.tipo = p.tipo; real.gen = p.gen;
+      // signo menos tipográfico en los textos (−6 en lugar de -6)
+      ["q", "e", "err"].forEach(function (k) { if (real[k]) real[k] = real[k].replace(/(^|[\s(=\[,:])-(\d)/g, "$1−$2"); });
+      p = real;
+    }
     var tipo = Tipos.de(p);
     return {
       orig: p, m: m,
@@ -226,6 +235,19 @@
   function iniciarMixto() {
     empezar("Examen mixto", revolver(todasPreparadas()), true, { tipo: "mixto" }, true);
   }
+  // Práctica infinita: solo ejercicios generados (Matemáticas, Física y Química)
+  function iniciarInfinita() {
+    var lugares = [];
+    materias.forEach(function (m) { m.preguntas.forEach(function (p) { if (p.gen) lugares.push({ p: p, m: m }); }); });
+    var delNivel = lugares.filter(function (x) { return pasaNivel(x.p); });
+    if (delNivel.length) lugares = delNivel;
+    var n = cantidadElegida() || 20, lista = [];
+    for (var i = 0; i < n; i++) {
+      var x = lugares[Math.floor(Math.random() * lugares.length)];
+      lista.push(prepararPregunta(x.p, x.m));
+    }
+    arrancar("practica", "🎲 Práctica infinita", lista, { tipo: "infinita" });
+  }
   function iniciarFormato() {
     empezar("Práctica formato examen", revolver(todasPreparadas(esFormatoExamen)), true, { tipo: "formato" }, true);
   }
@@ -319,7 +341,7 @@
     $("puntos").textContent = simulacro ? "" : "✔ " + redondear(estado.puntos);
     $("barra").style.width = (estado.pos / total * 100) + "%";
     $("etiqueta-tema").textContent = (estado.origen && estado.origen.tipo === "materia" ? "" : p.materia + " · ") + p.tema;
-    $("etiqueta-tipo").textContent = Tipos.nombre(p.tipo);
+    $("etiqueta-tipo").textContent = Tipos.nombre(p.tipo) + (p.orig.gen ? " · 🎲 números nuevos" : "");
     $("etiqueta-tipo").classList.toggle("oculto", p.tipo === "opcion");
     $("etiqueta-nivel").textContent = NIVELES[p.nivel];
     $("etiqueta-nivel").className = "etiqueta etiqueta-nivel nivel-" + p.nivel;
@@ -545,6 +567,7 @@
     if (o.tipo === "formato" && o.materiaId) { var mf = buscarMateria(o.materiaId); if (mf) { iniciarFormatoMateria(mf); return; } }
     if (o.tipo === "formato") { iniciarFormato(); return; }
     if (o.tipo === "simulacro") { iniciarSimulacro(); return; }
+    if (o.tipo === "infinita") { iniciarInfinita(); return; }
     if (o.tipo === "repaso" && o.lista) {
       empezar("Repaso de errores", o.lista.map(function (x) { return prepararPregunta(x.p, x.m); }), false, o); return;
     }
@@ -722,6 +745,7 @@
   });
   $("btn-mixto").addEventListener("click", iniciarMixto);
   $("btn-formato").addEventListener("click", iniciarFormato);
+  $("btn-infinita").addEventListener("click", iniciarInfinita);
   $("btn-simulacro").addEventListener("click", iniciarSimulacro);
   $("btn-atras-materia").addEventListener("click", irInicio);
   $("btn-salir").addEventListener("click", function () {
