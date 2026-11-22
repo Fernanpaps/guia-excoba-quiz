@@ -505,3 +505,36 @@ select {
 .opcion.tope { animation: tope .4s; }
 @keyframes tope { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 @media (prefers-reduced-motion: reduce) { .opcion.tope { animation: none; } }
+
+/* ===== Simulacro real: cuadrícula y calculadora ===== */
+.rejilla-caja { margin: -6px 0 14px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; }
+.rejilla-caja summary { cursor: pointer; font-weight: 700; font-size: .92rem; }
+.rejilla { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; max-height: 210px; overflow-y: auto; }
+.rejilla-seccion { flex-basis: 100%; font-size: .75rem; font-weight: 700; color: var(--muted); margin-top: 4px; }
+.rejilla-btn {
+  width: 34px; height: 30px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--bg); font-size: .78rem; font-weight: 600; cursor: pointer; padding: 0;
+}
+.rejilla-btn.hecha { background: var(--primary-soft); color: var(--primary); border-color: var(--primary); }
+.rejilla-btn.marcada { background: var(--bad); color: #fff; border-color: var(--bad); }
+.rejilla-btn.actual { outline: 3px solid #f59e0b; outline-offset: 1px; }
+.rejilla-leyenda { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: .75rem; color: var(--muted); margin: 8px 0 0; }
+.ley { display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--border); }
+.ley.hecha { background: var(--primary-soft); border-color: var(--primary); }
+.ley.marcada { background: var(--bad); border-color: var(--bad); }
+.ley.actual { outline: 2px solid #f59e0b; }
+.modo-simulacro .puntos { display: inline; color: var(--muted); font-weight: 600; font-size: .85rem; }
+#btn-marcar.activa { border-color: var(--bad); color: var(--bad); }
+.zona-sim { display: block; }
+.dlg-calc { width: min(340px, calc(100vw - 24px)); }
+.calc { padding: 12px 14px 16px; }
+.calc-resultado { min-height: 1.2em; font-size: .85rem; text-align: right; }
+.calc-pantalla {
+  width: 100%; font-size: 1.4rem; text-align: right; padding: 8px 10px; margin: 4px 0 10px;
+  border: 2px solid var(--border); border-radius: 10px; background: var(--bg); font-variant-numeric: tabular-nums;
+}
+.calc-teclas { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.calc-tecla { padding: 10px 0; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); font-weight: 700; cursor: pointer; }
+.calc-tecla:hover { border-color: var(--primary); }
+.calc-op { color: var(--primary); }
+.calc-igual { background: var(--primary); color: #fff; border-color: var(--primary); }

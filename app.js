@@ -272,41 +272,137 @@
     estado.respuestas = lista.map(function () { return null; });
     estado.notas = lista.map(function () { return null; });
     estado.origen = origen;
+    estado.cajas = [];
+    estado.marcadas = {};
+    $("zona-respuesta").innerHTML = "";
     $("pantalla-quiz").classList.toggle("modo-simulacro", modo === "simulacro");
-    if (modo === "simulacro") iniciarReloj(lista.length * 60);
+    $("rejilla-caja").classList.toggle("oculto", modo !== "simulacro");
+    if (modo === "simulacro") { pintarRejilla(); iniciarReloj(lista.length * 60); }
     else $("reloj").classList.add("oculto");
     mostrar("pantalla-quiz");
     pintarPregunta();
   }
 
-  // ---------- Simulacro ----------
-  // Proporciones parecidas al examen real (primaria + secundaria + bachillerato)
-  var REPARTO = [
-    { ids: ["espanol"], peso: 0.22 },
-    { ids: ["matematicas"], peso: 0.33 },
-    { ids: ["biologia"], peso: 0.11 },
-    { ids: ["quimica"], peso: 0.11 },
-    { ids: ["fisica"], peso: 0.11 },
-    { ids: ["historia_universal", "historia_mexico", "geografia"], peso: 0.12 }
-  ];
+  // ---------- Simulacro (misma estructura que el examen real) ----------
+  // 180 preguntas: 40 de primaria, 80 de secundaria y 60 de especialidad (3 materias según la carrera).
+  var T_MATE_PRIMARIA = ["Introducción a los números", "Fracciones", "Equivalencias", "Decimales y jerarquía de operaciones", "Porcentajes y regla de 3",
+    "Escalas y conversión de unidades", "Geometría (áreas y volúmenes)", "Geometría", "Círculo y esfera", "Probabilidad", "Estadística"];
+  var T_MATE_CALCULO = ["Cálculo y funciones", "Parábolas", "Función lineal", "Trigonometría (Pitágoras y funciones)", "Ecuación de segundo grado (fórmula general)",
+    "Sistemas de ecuaciones lineales", "Productos notables", "Operaciones con polinomios", "Leyes de exponentes y signos", "Álgebra", "Círculo y esfera",
+    "Geometría", "Ángulos", "Triángulos y semejanza", "Ecuaciones no lineales y con radicales", "Vectores"];
+  var T_MATE_ESTADISTICA = ["Estadística", "Probabilidad", "Conteo (permutaciones y combinaciones)", "Matemáticas financieras", "Álgebra",
+    "Ecuación de segundo grado (fórmula general)", "Productos notables", "Operaciones con polinomios", "Cálculo y funciones", "Ecuaciones lineales"];
+  var T_ESP_PRIMARIA = ["Usos de las letras", "Acentuación", "Acentuación (diacrítico)", "Signos de puntuación", "Uso de la coma", "La oración y sus partes",
+    "Sinónimos, homófonos y homónimos", "Cuento", "Textos instructivos", "Recuento histórico", "Comprensión lectora", "Resumen", "Tipos de textos"];
+  var ESPECIALIDAD = {
+    software: { nombre: "Ingeniería de Software", materias: [["Matemáticas para cálculo", "matematicas", T_MATE_CALCULO], ["Física", "fisica"], ["Química", "quimica"]] },
+    ingenieria: { nombre: "Ingenierías y Arquitectura", materias: [["Matemáticas para cálculo", "matematicas", T_MATE_CALCULO], ["Física", "fisica"], ["Lenguaje", "espanol"]] },
+    salud: { nombre: "Medicina, Optometría y afines", materias: [["Matemáticas para estadística", "matematicas", T_MATE_ESTADISTICA], ["Biología", "biologia"], ["Química", "quimica"]] },
+    biologicas: { nombre: "Biología, Enfermería y afines", materias: [["Física", "fisica"], ["Biología", "biologia"], ["Química", "quimica"]] },
+    sociales: { nombre: "Administración, Derecho y afines", materias: [["Matemáticas para estadística", "matematicas", T_MATE_ESTADISTICA], ["Lenguaje", "espanol"], ["Humanidades (aprox.: civismo y ciencias sociales)", "geografia"]] }
+  };
+  function seccionesDe(carrera) {
+    var esp = ESPECIALIDAD[carrera] || ESPECIALIDAD.software;
+    var s = [
+      { nombre: "Primaria · Español", n: 20, fuentes: [["espanol", T_ESP_PRIMARIA]] },
+      { nombre: "Primaria · Matemáticas", n: 20, fuentes: [["matematicas", T_MATE_PRIMARIA]] },
+      { nombre: "Secundaria · Español", n: 20, fuentes: [["espanol"]] },
+      { nombre: "Secundaria · Matemáticas", n: 20, fuentes: [["matematicas"]] },
+      { nombre: "Secundaria · Ciencias naturales", n: 20, fuentes: [["biologia", null, 7], ["fisica", null, 7], ["quimica", null, 6]] },
+      { nombre: "Secundaria · Ciencias sociales", n: 20, fuentes: [["historia_mexico", null, 6], ["historia_universal", null, 6], ["geografia", null, 8]] }
+    ];
+    esp.materias.forEach(function (m) { s.push({ nombre: "Especialidad · " + m[0], n: 20, fuentes: [[m[1], m[2] || null]] }); });
+    return s;
+  }
   function iniciarSimulacro() {
     var n = parseInt($("sel-simulacro").value, 10) || 30;
-    var elegidas = [];
-    REPARTO.forEach(function (grupo, gi) {
-      var cuantas = gi === REPARTO.length - 1 ? n - elegidas.length : Math.round(n * grupo.peso);
-      var pool = [];
-      grupo.ids.forEach(function (id) { var m = buscarMateria(id); if (m) pool = pool.concat(preparar(m.preguntas, m)); });
-      // Primero las del nivel elegido; si no alcanzan, se completa con las demás
-      var delNivel = revolver(pool.filter(function (x) { return pasaNivel(x.orig); }));
-      var otras = revolver(pool.filter(function (x) { return !pasaNivel(x.orig); }));
-      pool = delNivel.concat(otras);
-      // La mitad (o lo que haya) con formato de examen real, el resto de opción múltiple
-      var formato = pool.filter(function (x) { return x.tipo !== "opcion"; });
-      var opcion = pool.filter(function (x) { return x.tipo === "opcion"; });
-      var deFormato = Math.min(formato.length, Math.ceil(cuantas / 2));
-      elegidas = elegidas.concat(formato.slice(0, deFormato), opcion.slice(0, cuantas - deFormato));
+    var carrera = $("sel-carrera").value;
+    var usadas = [], elegidas = [];
+    var factor = n / 180;
+    seccionesDe(carrera).forEach(function (sec) {
+      var cuantasSec = Math.max(1, Math.round(sec.n * factor));
+      sec.fuentes.forEach(function (f, fi) {
+        var cuantas = f[2] ? Math.max(1, Math.round(f[2] * factor)) : cuantasSec;
+        if (fi === sec.fuentes.length - 1 && f[2]) {
+          var ya = elegidas.filter(function (x) { return x.seccion === sec.nombre; }).length;
+          cuantas = Math.max(0, cuantasSec - ya);
+        }
+        var m = buscarMateria(f[0]);
+        if (!m || !cuantas) return;
+        var base = m.preguntas.filter(function (p) { return usadas.indexOf(p) === -1; });
+        var conTema = f[1] ? base.filter(function (p) { return f[1].indexOf(p.t) !== -1; }) : base;
+        if (conTema.length < cuantas) conTema = conTema.concat(revolver(base.filter(function (p) { return conTema.indexOf(p) === -1; })));
+        // Primero las del nivel elegido, la mitad con formato de examen real
+        var delNivel = revolver(conTema.filter(pasaNivel)), otras = revolver(conTema.filter(function (p) { return !pasaNivel(p); }));
+        var orden = delNivel.concat(otras);
+        var formato = orden.filter(esFormatoExamen), opcion = orden.filter(function (p) { return !esFormatoExamen(p); });
+        var deFormato = Math.min(formato.length, Math.ceil(cuantas / 2));
+        var tomadas = formato.slice(0, deFormato).concat(opcion.slice(0, cuantas - deFormato));
+        if (tomadas.length < cuantas) tomadas = tomadas.concat(formato.slice(deFormato, deFormato + cuantas - tomadas.length));
+        tomadas.forEach(function (p) {
+          usadas.push(p);
+          var prep = prepararPregunta(p, m);
+          prep.seccion = sec.nombre;
+          elegidas.push(prep);
+        });
+      });
     });
-    arrancar("simulacro", "Simulacro EXCOBA (" + n + " preguntas)", revolver(elegidas), { tipo: "simulacro" });
+    // Como en el examen, van por secciones (primaria → secundaria → especialidad); dentro de cada sección se revuelven
+    var porSeccion = {}, ordenSec = [];
+    elegidas.forEach(function (p) { if (!porSeccion[p.seccion]) { porSeccion[p.seccion] = []; ordenSec.push(p.seccion); } porSeccion[p.seccion].push(p); });
+    var final = [];
+    ordenSec.forEach(function (s) { final = final.concat(revolver(porSeccion[s])); });
+    arrancar("simulacro", "Simulacro EXCOBA (" + final.length + " preguntas · " + (ESPECIALIDAD[carrera] || ESPECIALIDAD.software).nombre + ")", final, { tipo: "simulacro" });
+  }
+
+  // ---------- Cuadrícula de preguntas del simulacro ----------
+  function pintarRejilla() {
+    var r = $("rejilla");
+    r.innerHTML = "";
+    estado.preguntas.forEach(function (p, i) {
+      if (i === 0 || p.seccion !== estado.preguntas[i - 1].seccion) r.appendChild(el("span", "rejilla-seccion", p.seccion || ""));
+      var b = el("button", "rejilla-btn", String(i + 1));
+      b.type = "button";
+      b.title = (p.seccion || p.materia) + " · pregunta " + (i + 1);
+      b.addEventListener("click", function () { irA(i); });
+      r.appendChild(b);
+    });
+  }
+  function contestada(i) {
+    var caja = estado.cajas[i], p = estado.preguntas[i];
+    return !!caja && Tipos.de(p.orig).leer(p.datos, caja) !== null;
+  }
+  function actualizarRejilla() {
+    if (estado.modo !== "simulacro") return;
+    var btns = $("rejilla").querySelectorAll(".rejilla-btn"), hechas = 0;
+    btns.forEach(function (b, i) {
+      var c = contestada(i); if (c) hechas++;
+      b.classList.toggle("hecha", c);
+      b.classList.toggle("marcada", !!estado.marcadas[i]);
+      b.classList.toggle("actual", i === estado.pos);
+    });
+    $("puntos").textContent = hechas + "/" + estado.preguntas.length + " contestadas";
+    var marc = Object.keys(estado.marcadas).filter(function (k) { return estado.marcadas[k]; }).length;
+    $("btn-marcar").textContent = estado.marcadas[estado.pos] ? "🚩 Quitar marca" : "🚩 Marcar para revisar";
+    $("btn-marcar").classList.toggle("activa", !!estado.marcadas[estado.pos]);
+    $("rejilla-resumen").textContent = marc ? marc + " marcada" + (marc > 1 ? "s" : "") + " para revisar" : "";
+  }
+  function irA(i) {
+    if (i < 0 || i >= estado.preguntas.length) return;
+    estado.pos = i;
+    pintarPregunta();
+    window.scrollTo(0, 0);
+  }
+  function terminarSimulacro(porTiempo) {
+    var sin = estado.preguntas.filter(function (_, i) { return !contestada(i); }).length;
+    if (!porTiempo && sin && !confirm("Te faltan " + sin + " preguntas por contestar. ¿Terminar de todos modos?")) return;
+    estado.preguntas.forEach(function (p, i) {
+      var caja = estado.cajas[i], tipo = Tipos.de(p.orig);
+      var r = caja ? tipo.leer(p.datos, caja) : null;
+      estado.respuestas[i] = r;
+      estado.notas[i] = r === null ? 0 : tipo.calificar(p.datos, r);
+    });
+    pintarResultados();
   }
   function iniciarReloj(segundos) {
     estado.fin = Date.now() + segundos * 1000;
@@ -323,7 +419,7 @@
     if (resta === 0) {
       detenerReloj();
       alert("⏰ Se acabó el tiempo. Las preguntas sin contestar valen 0, igual que en el examen.");
-      pintarResultados();
+      terminarSimulacro(true);
     }
   }
 
@@ -340,7 +436,7 @@
     $("contador").textContent = "Pregunta " + (estado.pos + 1) + " de " + total;
     $("puntos").textContent = simulacro ? "" : "✔ " + redondear(estado.puntos);
     $("barra").style.width = (estado.pos / total * 100) + "%";
-    $("etiqueta-tema").textContent = (estado.origen && estado.origen.tipo === "materia" ? "" : p.materia + " · ") + p.tema;
+    $("etiqueta-tema").textContent = p.seccion ? p.seccion : (estado.origen && estado.origen.tipo === "materia" ? "" : p.materia + " · ") + p.tema;
     $("etiqueta-tipo").textContent = Tipos.nombre(p.tipo) + (p.orig.gen ? " · 🎲 números nuevos" : "");
     $("etiqueta-tipo").classList.toggle("oculto", p.tipo === "opcion");
     $("etiqueta-nivel").textContent = NIVELES[p.nivel];
@@ -353,13 +449,29 @@
     $("instruccion").classList.toggle("oculto", p.tipo === "opcion");
 
     var cont = $("zona-respuesta");
-    cont.innerHTML = "";
-    delete cont.dataset.elegida;
-    delete cont.dataset.orden;
-    cont.className = "zona-respuesta tipo-" + p.tipo;
     // En práctica, las de opción múltiple se califican al tocarlas (como siempre)
     var instantanea = !simulacro && p.tipo === "opcion";
-    tipo.pintar(p.datos, cont, instantanea ? function () { comprobar(); } : null);
+    if (simulacro) {
+      // Cada pregunta del simulacro guarda su propia caja: al regresar, la respuesta sigue ahí
+      var idx = estado.cola[estado.pos];
+      if (!estado.cajas[idx]) {
+        var caja = el("div", "zona-respuesta caja-pregunta tipo-" + p.tipo);
+        tipo.pintar(p.datos, caja, null);
+        caja.addEventListener("click", function () { setTimeout(actualizarRejilla, 0); });
+        caja.addEventListener("change", actualizarRejilla);
+        caja.addEventListener("input", actualizarRejilla);
+        estado.cajas[idx] = caja;
+        cont.appendChild(caja);
+      }
+      cont.className = "zona-sim";
+      [].forEach.call(cont.children, function (c) { c.classList.toggle("oculto", c !== estado.cajas[idx]); });
+    } else {
+      cont.innerHTML = "";
+      delete cont.dataset.elegida;
+      delete cont.dataset.orden;
+      cont.className = "zona-respuesta tipo-" + p.tipo;
+      tipo.pintar(p.datos, cont, instantanea ? function () { comprobar(); } : null);
+    }
 
     $("retro").classList.add("oculto");
     $("explicacion").classList.add("oculto");
@@ -369,10 +481,15 @@
     var ultima = estado.pos === estado.cola.length - 1;
     $("btn-comprobar").classList.toggle("oculto", simulacro || instantanea);
     $("btn-comprobar").disabled = false;
-    $("btn-saltar").classList.toggle("oculto", !simulacro || ultima);
+    $("btn-anterior").classList.toggle("oculto", !simulacro);
+    $("btn-anterior").disabled = estado.pos === 0;
+    $("btn-marcar").classList.toggle("oculto", !simulacro);
+    $("btn-terminar").classList.toggle("oculto", !simulacro);
+    $("btn-calc").classList.toggle("oculto", !simulacro);
     $("btn-siguiente").disabled = !simulacro;
     $("btn-siguiente").textContent = ultima ? (simulacro ? "Terminar examen" : "Ver resultados") : "Siguiente →";
     $("btn-siguiente").classList.toggle("oculto", !simulacro && !instantanea);
+    actualizarRejilla();
   }
 
   // ---------- Comprobar (modo práctica) ----------
@@ -442,14 +559,12 @@
   // ---------- Avanzar ----------
   function siguiente() {
     if (estado.modo === "simulacro") {
-      // Guarda la respuesta (aunque esté vacía) sin decir si está bien
-      var p = actual(), tipo = Tipos.de(p.orig);
-      var r = tipo.leer(p.datos, $("zona-respuesta"));
-      var i = estado.cola[estado.pos];
-      estado.respuestas[i] = r;
-      estado.notas[i] = r === null ? 0 : tipo.calificar(p.datos, r);
-    } else if (!estado.respondida) return;
-
+      // En el simulacro no se califica al avanzar: la respuesta se queda guardada en su caja
+      if (estado.pos < estado.preguntas.length - 1) irA(estado.pos + 1);
+      else terminarSimulacro(false);
+      return;
+    }
+    if (!estado.respondida) return;
     if (estado.pos < estado.cola.length - 1) {
       estado.pos++;
       pintarPregunta();
@@ -457,13 +572,6 @@
     } else {
       pintarResultados();
     }
-  }
-  // Simulacro: dejar para después (se manda al final de la fila)
-  function saltar() {
-    var i = estado.cola.splice(estado.pos, 1)[0];
-    estado.cola.push(i);
-    pintarPregunta();
-    window.scrollTo(0, 0);
   }
 
   // ---------- Resultados ----------
@@ -536,13 +644,14 @@
     cont.innerHTML = "";
     var por = {}, orden = [];
     estado.preguntas.forEach(function (p, i) {
-      if (!por[p.materia]) { por[p.materia] = { pts: 0, n: 0 }; orden.push(p.materia); }
-      por[p.materia].pts += estado.notas[i] || 0;
-      por[p.materia].n++;
+      var g = p.seccion || p.materia;
+      if (!por[g]) { por[g] = { pts: 0, n: 0 }; orden.push(g); }
+      por[g].pts += estado.notas[i] || 0;
+      por[g].n++;
     });
     if (orden.length < 2) { cont.classList.add("oculto"); return; }
     cont.classList.remove("oculto");
-    cont.appendChild(el("strong", "", "Tu calificación por materia"));
+    cont.appendChild(el("strong", "", estado.preguntas[0].seccion ? "Tu calificación por sección y materia" : "Tu calificación por materia"));
     orden.sort(function (a, b) { return por[a].pts / por[a].n - por[b].pts / por[b].n; });
     orden.forEach(function (nombre) {
       var d = por[nombre], pct = Math.round(d.pts / d.n * 100);
@@ -731,6 +840,43 @@
     mostrar("pantalla-inicio");
   }
 
+  // ---------- Calculadora (como la del examen) ----------
+  function abrirCalculadora() {
+    var d = $("dlg-calc");
+    if (d.showModal) d.showModal(); else d.setAttribute("open", "");
+    $("calc-pantalla").focus();
+  }
+  function armarCalculadora() {
+    var teclas = ["7", "8", "9", "÷", "(", ")", "4", "5", "6", "×", "√", "x²", "1", "2", "3", "−", "^", "π", "0", ".", "⌫", "+", "C", "="];
+    var cont = $("calc-teclas"), pant = $("calc-pantalla");
+    teclas.forEach(function (t) {
+      var b = el("button", "calc-tecla" + (t === "=" ? " calc-igual" : /[÷×−+^]/.test(t) ? " calc-op" : ""), t);
+      b.type = "button";
+      b.addEventListener("click", function () {
+        if (t === "C") { pant.value = ""; $("calc-resultado").textContent = ""; }
+        else if (t === "⌫") pant.value = pant.value.slice(0, -1);
+        else if (t === "=") calcular();
+        else pant.value += { "√": "√(", "x²": "^2", "π": "π" }[t] || t;
+        pant.focus();
+      });
+      cont.appendChild(b);
+    });
+    pant.addEventListener("keydown", function (ev) { if (ev.key === "Enter") { ev.preventDefault(); calcular(); } });
+  }
+  function calcular() {
+    var pant = $("calc-pantalla"), txt = pant.value.trim();
+    if (!txt) return;
+    try {
+      var v = Tipos._evaluar(txt.replace(/π/g, "(3.14159265)"));
+      if (!isFinite(v)) throw new Error("no válido");
+      var res = Math.round(v * 1e8) / 1e8;
+      $("calc-resultado").textContent = txt + " =";
+      pant.value = String(res);
+    } catch (e) {
+      $("calc-resultado").textContent = "Revisa la operación";
+    }
+  }
+
   // ---------- Formulario (como el del examen) ----------
   function abrirFormulario() {
     var d = $("dlg-formulario");
@@ -752,18 +898,23 @@
   $("btn-simulacro").addEventListener("click", iniciarSimulacro);
   $("btn-atras-materia").addEventListener("click", irInicio);
   $("btn-salir").addEventListener("click", function () {
-    var algo = estado.notas.some(function (n) { return n !== null; });
+    var algo = estado.notas.some(function (n) { return n !== null; }) || (estado.modo === "simulacro" && estado.cajas.some(Boolean));
     if (!algo) { irInicio(); return; }
-    if (estado.modo === "simulacro") {
-      if (confirm("¿Terminar el simulacro ahora? Se calificará lo que llevas.")) pintarResultados();
-      return;
-    }
+    if (estado.modo === "simulacro") { terminarSimulacro(false); return; }
     if (confirm("¿Seguro que quieres salir? Se perderá el avance de esta ronda.")) irInicio();
   });
   $("btn-explicacion").addEventListener("click", alternarExplicacion);
   $("btn-comprobar").addEventListener("click", comprobar);
   $("btn-siguiente").addEventListener("click", siguiente);
-  $("btn-saltar").addEventListener("click", saltar);
+  $("btn-anterior").addEventListener("click", function () { irA(estado.pos - 1); });
+  $("btn-marcar").addEventListener("click", function () { estado.marcadas[estado.pos] = !estado.marcadas[estado.pos]; actualizarRejilla(); });
+  $("btn-terminar").addEventListener("click", function () { terminarSimulacro(false); });
+  $("btn-calc").addEventListener("click", abrirCalculadora);
+  $("btn-cerrar-calc").addEventListener("click", function () { var d = $("dlg-calc"); if (d.close) d.close(); else d.removeAttribute("open"); });
+  $("dlg-calc").addEventListener("click", function (ev) { if (ev.target === ev.currentTarget) $("btn-cerrar-calc").click(); });
+  armarCalculadora();
+  try { var carreraGuardada = localStorage.getItem("excoba-carrera"); if (carreraGuardada) $("sel-carrera").value = carreraGuardada; } catch (e) {}
+  $("sel-carrera").addEventListener("change", function () { try { localStorage.setItem("excoba-carrera", $("sel-carrera").value); } catch (e) {} });
   $("btn-repasar").addEventListener("click", repasarErrores);
   $("btn-otra-vez").addEventListener("click", otraRonda);
   $("btn-volver-inicio").addEventListener("click", irInicio);
@@ -787,7 +938,7 @@
   // Atajos de teclado: 1-4 o A-D para opción múltiple, Enter para comprobar/seguir
   document.addEventListener("keydown", function (ev) {
     if ($("pantalla-quiz").classList.contains("oculto")) return;
-    if ($("dlg-formulario").open) return;
+    if ($("dlg-formulario").open || $("dlg-calc").open) return;
     var enCampo = ev.target && (ev.target.tagName === "SELECT" || ev.target.tagName === "INPUT");
     var p = actual();
     if (ev.key === "Enter" && enCampo && ev.target.tagName === "INPUT") {
@@ -800,7 +951,8 @@
     var idx = "1234".indexOf(k);
     if (idx === -1) idx = "ABCD".indexOf(k);
     if (idx !== -1 && !estado.respondida && p.tipo === "opcion") {
-      var b = $("zona-respuesta").querySelectorAll(".opcion")[idx];
+      var zonaAct = estado.modo === "simulacro" ? estado.cajas[estado.cola[estado.pos]] : $("zona-respuesta");
+      var b = zonaAct && zonaAct.querySelectorAll(".opcion")[idx];
       if (b) b.click();
     } else if (ev.key === "Enter" && document.activeElement === document.body) {
       if (estado.modo === "practica" && !estado.respondida && p.tipo !== "opcion") comprobar();

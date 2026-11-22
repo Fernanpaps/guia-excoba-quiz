@@ -6,7 +6,7 @@
   <title>Guía EXCOBA Quiz</title>
   <meta name="description" content="Cuestionario interactivo para estudiar el examen EXCOBA, con explicación paso a paso de cada pregunta.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
-  <link rel="stylesheet" href="styles.css?v=6">
+  <link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
   <header class="topbar">
@@ -69,15 +69,21 @@
           <span class="mixto-icono" aria-hidden="true">🎯</span>
           <div>
             <strong>Simulacro EXCOBA</strong>
-            <p class="muted">Como el examen real: 1 minuto por pregunta, no ves si acertaste hasta el final y vienen los 4 formatos (escribir números, expresiones, clasificar, ordenar y elegir). La meta es <strong>70</strong>.</p>
+            <p class="muted">Como el examen real: 180 preguntas en 3 horas (40 de primaria, 80 de secundaria y 60 de tu especialidad), cuadrícula para moverte, marcar para revisar, calculadora y formulario. Ves tu calificación por sección al final. La meta es <strong>70</strong>.</p>
           </div>
         </div>
         <div class="simulacro-controles">
+          <select id="sel-carrera" aria-label="Carrera (materias de especialidad)">
+            <option value="software" selected>Ing. de Software: Mate cálculo, Física, Química</option>
+            <option value="ingenieria">Ingenierías y Arquitectura: Mate cálculo, Física, Lenguaje</option>
+            <option value="salud">Medicina y afines: Mate estadística, Biología, Química</option>
+            <option value="biologicas">Biología, Enfermería y afines: Física, Biología, Química</option>
+            <option value="sociales">Administración, Derecho y afines: Mate estadística, Lenguaje, Humanidades</option>
+          </select>
           <select id="sel-simulacro" aria-label="Tamaño del simulacro">
-            <option value="30" selected>30 preguntas · 30 min</option>
-            <option value="60">60 preguntas · 1 h</option>
-            <option value="120">120 preguntas · 2 h</option>
-            <option value="180">180 preguntas · 3 h (completo)</option>
+            <option value="180">180 preguntas · 3 h (examen completo)</option>
+            <option value="90">90 preguntas · 1 h 30 min (medio examen)</option>
+            <option value="45" selected>45 preguntas · 45 min (práctica rápida)</option>
           </select>
           <button class="btn btn-primario" id="btn-simulacro" type="button">Empezar simulacro</button>
         </div>
@@ -147,6 +153,11 @@
         <span class="reloj oculto" id="reloj" role="timer" aria-live="off"></span>
       </div>
       <div class="barra"><div class="barra-relleno" id="barra"></div></div>
+      <details class="rejilla-caja oculto" id="rejilla-caja" open>
+        <summary>Cuadrícula de preguntas <span class="muted" id="rejilla-resumen"></span></summary>
+        <div class="rejilla" id="rejilla"></div>
+        <p class="rejilla-leyenda"><span class="ley hecha"></span> contestada <span class="ley marcada"></span> marcada para revisar <span class="ley actual"></span> actual</p>
+      </details>
 
       <article class="card pregunta-card">
         <div class="etiquetas">
@@ -154,6 +165,7 @@
           <span class="etiqueta etiqueta-tipo oculto" id="etiqueta-tipo"></span>
           <span class="etiqueta etiqueta-nivel" id="etiqueta-nivel"></span>
           <button class="btn-formulario" id="btn-formulario" type="button">📐 Formulario</button>
+          <button class="btn-formulario oculto" id="btn-calc" type="button">🧮 Calculadora</button>
         </div>
         <h2 class="pregunta" id="texto-pregunta"></h2>
         <div class="lectura oculto" id="lectura"></div>
@@ -169,7 +181,9 @@
       </article>
 
       <div class="quiz-acciones">
-        <button class="btn btn-fantasma oculto" id="btn-saltar" type="button">Saltar (regreso después)</button>
+        <button class="btn btn-fantasma oculto" id="btn-anterior" type="button">← Anterior</button>
+        <button class="btn btn-fantasma oculto" id="btn-marcar" type="button">🚩 Marcar para revisar</button>
+        <button class="btn btn-fantasma oculto" id="btn-terminar" type="button">Finalizar</button>
         <button class="btn btn-primario oculto" id="btn-comprobar" type="button">Comprobar</button>
         <button class="btn btn-primario" id="btn-siguiente" type="button" disabled>Siguiente →</button>
       </div>
@@ -284,36 +298,48 @@
     </div>
   </dialog>
 
+  <dialog class="dlg-formulario dlg-calc" id="dlg-calc" aria-labelledby="titulo-calc">
+    <div class="dlg-cabeza">
+      <strong id="titulo-calc">🧮 Calculadora</strong>
+      <button class="btn btn-fantasma" id="btn-cerrar-calc" type="button">Cerrar ✕</button>
+    </div>
+    <div class="calc">
+      <div class="calc-resultado muted" id="calc-resultado"></div>
+      <input class="calc-pantalla" id="calc-pantalla" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Operación">
+      <div class="calc-teclas" id="calc-teclas"></div>
+    </div>
+  </dialog>
+
   <footer class="pie">made by us :v</footer>
 
   <!-- Primero el banco, luego las preguntas de cada materia y al final la lógica de la página -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-  <script src="config.js?v=6"></script>
-  <script src="cuenta.js?v=6"></script>
-  <script src="tipos.js?v=6"></script>
-  <script src="errores.js?v=6"></script>
-  <script src="figuras.js?v=6"></script>
-  <script src="banco.js?v=6"></script>
-  <script src="data/espanol.js?v=6"></script>
-  <script src="data/matematicas.js?v=6"></script>
-  <script src="data/historia_universal.js?v=6"></script>
-  <script src="data/geografia_civismo.js?v=6"></script>
-  <script src="data/historia_mexico.js?v=6"></script>
-  <script src="data/biologia.js?v=6"></script>
-  <script src="data/quimica.js?v=6"></script>
-  <script src="data/fisica.js?v=6"></script>
+  <script src="config.js?v=7"></script>
+  <script src="cuenta.js?v=7"></script>
+  <script src="tipos.js?v=7"></script>
+  <script src="errores.js?v=7"></script>
+  <script src="figuras.js?v=7"></script>
+  <script src="banco.js?v=7"></script>
+  <script src="data/espanol.js?v=7"></script>
+  <script src="data/matematicas.js?v=7"></script>
+  <script src="data/historia_universal.js?v=7"></script>
+  <script src="data/geografia_civismo.js?v=7"></script>
+  <script src="data/historia_mexico.js?v=7"></script>
+  <script src="data/biologia.js?v=7"></script>
+  <script src="data/quimica.js?v=7"></script>
+  <script src="data/fisica.js?v=7"></script>
   <!-- Preguntas con el formato del examen real -->
-  <script src="data/examen/matematicas.js?v=6"></script>
-  <script src="data/examen/espanol.js?v=6"></script>
-  <script src="data/examen/ciencias.js?v=6"></script>
-  <script src="data/examen/sociales.js?v=6"></script>
-  <script src="data/examen/figuras.js?v=6"></script>
-  <script src="data/examen/espanol_lectura.js?v=6"></script>
-  <script src="data/examen/memoria.js?v=6"></script>
+  <script src="data/examen/matematicas.js?v=7"></script>
+  <script src="data/examen/espanol.js?v=7"></script>
+  <script src="data/examen/ciencias.js?v=7"></script>
+  <script src="data/examen/sociales.js?v=7"></script>
+  <script src="data/examen/figuras.js?v=7"></script>
+  <script src="data/examen/espanol_lectura.js?v=7"></script>
+  <script src="data/examen/memoria.js?v=7"></script>
   <!-- Ejercicios con números al azar -->
-  <script src="generadores.js?v=6"></script>
-  <script src="generadores_ciencias.js?v=6"></script>
-  <script src="generadores_especialidad.js?v=6"></script>
-  <script src="app.js?v=6"></script>
+  <script src="generadores.js?v=7"></script>
+  <script src="generadores_ciencias.js?v=7"></script>
+  <script src="generadores_especialidad.js?v=7"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>

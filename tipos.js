@@ -648,6 +648,7 @@
     de: function (p) { return T[p.tipo || "opcion"] || T.opcion; },
     nombre: function (tipo) { return NOMBRES[tipo || "opcion"]; },
     // Para pruebas
-    _leerNumero: leerNumero, _expresionesIguales: expresionesIguales
+    _leerNumero: leerNumero, _expresionesIguales: expresionesIguales,
+    _evaluar: function (t) { return compilar(t)({}); }
   };
 })();
